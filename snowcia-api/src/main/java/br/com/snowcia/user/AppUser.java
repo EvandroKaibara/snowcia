@@ -34,6 +34,9 @@ public class AppUser implements UserDetails {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @Column(length = 30)
+    private String phone;
+
     @Column(nullable = false, length = 255)
     private String password;
 
@@ -50,9 +53,10 @@ public class AppUser implements UserDetails {
     protected AppUser() {
     }
 
-    public AppUser(String name, String email, String password, Role role) {
+    public AppUser(String name, String email, String phone, String password, Role role) {
         this.name = name;
         this.email = email;
+        this.phone = phone;
         this.password = password;
         this.role = role;
     }
@@ -78,6 +82,10 @@ public class AppUser implements UserDetails {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getPhone() {
+        return phone;
     }
 
     public String getRoleName() {
