@@ -18,3 +18,8 @@ spring:
 
 server:
   port: 8080
+
+security:
+  jwt:
+    secret: snowcia-development-secret-key-must-have-at-least-thirty-two-characters
+    expiration-minutes: 60
