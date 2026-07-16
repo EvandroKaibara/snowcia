@@ -37,6 +37,9 @@ public class AppUser implements UserDetails {
     @Column(length = 30)
     private String phone;
 
+    @Column(length = 300)
+    private String address;
+
     @Column(nullable = false, length = 255)
     private String password;
 
@@ -87,6 +90,16 @@ public class AppUser implements UserDetails {
     public String getPhone() {
         return phone;
     }
+
+    public String getAddress() { return address; }
+
+    public void updateProfile(String name, String phone, String address) {
+        this.name = name;
+        this.phone = phone;
+        this.address = address;
+    }
+
+    public void changePassword(String password) { this.password = password; }
 
     public String getRoleName() {
         return role.getName();

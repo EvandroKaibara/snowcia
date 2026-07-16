@@ -24,7 +24,8 @@ public class PetService {
     }
 
     public List<PetResponse> list(AppUser owner) {
-        return petRepository.findAllByOwnerIdOrderByNameAsc(owner.getId()).stream().map(PetResponse::from).toList();
+        var pets = owner.isAdmin() ? petRepository.findAllByOrderByNameAsc() : petRepository.findAllByOwnerIdOrderByNameAsc(owner.getId());
+        return pets.stream().map(PetResponse::from).toList();
     }
 
     public PetResponse get(AppUser owner, Long id) {
