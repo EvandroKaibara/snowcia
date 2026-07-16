@@ -8,6 +8,7 @@ import br.com.snowcia.payment.PaymentMethod;
 import br.com.snowcia.payment.PaymentRepository;
 import br.com.snowcia.payment.PaymentStatus;
 import br.com.snowcia.pet.Pet;
+import br.com.snowcia.pet.PetSpecies;
 import br.com.snowcia.pet.PetRepository;
 import br.com.snowcia.reservation.dto.DeclineReservationRequest;
 import br.com.snowcia.reservation.dto.ReservationRequest;
@@ -43,10 +44,11 @@ public class ReservationService {
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
         validateDates(request);
         var pet = findOwnedPet(owner, request.petId());
+        validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
         var price = pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate());
         var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), request.checkInDate(),
-                request.checkOutDate(), normalize(request.notes()), price.totalAmount()));
+                request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price.totalAmount()));
         return ReservationResponse.from(reservation);
     }
 
@@ -70,8 +72,9 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O pet da reserva não pode ser alterado");
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
+        validateServiceForPet(reservation.getPet(), request.serviceType());
         var price = pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate());
-        reservation.update(request.checkInDate(), request.checkOutDate(), normalize(request.notes()));
+        reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateTotalAmount(price.totalAmount());
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
@@ -119,6 +122,15 @@ public class ReservationService {
     private void validateDates(ReservationRequest request) {
         if (!request.checkOutDate().isAfter(request.checkInDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A saída deve ser posterior à entrada");
+        }
+        if (request.checkInDate().equals(request.checkOutDate()) && !request.checkOutTime().isAfter(request.checkInTime())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A saída deve ser posterior à entrada");
+        }
+    }
+
+    private void validateServiceForPet(Pet pet, ReservationServiceType serviceType) {
+        if (pet.getSpecies() == PetSpecies.DOG && serviceType.name().startsWith("CAT_SITTER")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CatSitter está disponível somente para gatos");
         }
     }
 

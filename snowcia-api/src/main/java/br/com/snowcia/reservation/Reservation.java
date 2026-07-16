@@ -2,6 +2,7 @@ package br.com.snowcia.reservation;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.math.BigDecimal;
 
 import br.com.snowcia.pet.Pet;
@@ -37,6 +38,12 @@ public class Reservation {
     @Column(name = "check_out_date", nullable = false)
     private LocalDate checkOutDate;
 
+    @Column(name = "check_in_time")
+    private LocalTime checkInTime;
+
+    @Column(name = "check_out_time")
+    private LocalTime checkOutTime;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private ReservationStatus status;
@@ -64,17 +71,19 @@ public class Reservation {
     }
 
     public Reservation(Pet pet, ReservationServiceType serviceType, LocalDate checkInDate, LocalDate checkOutDate,
-            String notes, BigDecimal totalAmount) {
+            LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
         this.totalAmount = totalAmount;
-        update(checkInDate, checkOutDate, notes);
+        update(checkInDate, checkOutDate, checkInTime, checkOutTime, notes);
     }
 
-    public void update(LocalDate checkInDate, LocalDate checkOutDate, String notes) {
+    public void update(LocalDate checkInDate, LocalDate checkOutDate, LocalTime checkInTime, LocalTime checkOutTime, String notes) {
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
+        this.checkInTime = checkInTime;
+        this.checkOutTime = checkOutTime;
         this.notes = notes;
     }
 
@@ -111,6 +120,8 @@ public class Reservation {
     public Pet getPet() { return pet; }
     public LocalDate getCheckInDate() { return checkInDate; }
     public LocalDate getCheckOutDate() { return checkOutDate; }
+    public LocalTime getCheckInTime() { return checkInTime; }
+    public LocalTime getCheckOutTime() { return checkOutTime; }
     public ReservationStatus getStatus() { return status; }
     public ReservationServiceType getServiceType() { return serviceType; }
     public String getNotes() { return notes; }
