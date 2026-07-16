@@ -23,3 +23,9 @@ security:
   jwt:
     secret: snowcia-development-secret-key-must-have-at-least-thirty-two-characters
     expiration-minutes: 60
+
+app:
+  bootstrap-admin:
+    name: ${BOOTSTRAP_ADMIN_NAME:Snowcia Admin}
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
