@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: snowcia-api
+
+  profiles:
+    active: dev
