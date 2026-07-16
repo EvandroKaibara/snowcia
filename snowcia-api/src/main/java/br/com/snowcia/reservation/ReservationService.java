@@ -2,6 +2,10 @@ package br.com.snowcia.reservation;
 
 import java.util.List;
 
+import br.com.snowcia.payment.Payment;
+import br.com.snowcia.payment.PaymentMethod;
+import br.com.snowcia.payment.PaymentRepository;
+import br.com.snowcia.payment.PaymentStatus;
 import br.com.snowcia.pet.Pet;
 import br.com.snowcia.pet.PetRepository;
 import br.com.snowcia.reservation.dto.ReservationRequest;
@@ -16,27 +20,37 @@ public class ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final PetRepository petRepository;
+    private final PaymentRepository paymentRepository;
+    private final ReservationPricingService pricingService;
 
-    public ReservationService(ReservationRepository reservationRepository, PetRepository petRepository) {
+    public ReservationService(ReservationRepository reservationRepository, PetRepository petRepository,
+            PaymentRepository paymentRepository, ReservationPricingService pricingService) {
         this.reservationRepository = reservationRepository;
         this.petRepository = petRepository;
+        this.paymentRepository = paymentRepository;
+        this.pricingService = pricingService;
     }
 
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
         validateDates(request);
         var pet = findOwnedPet(owner, request.petId());
         ensureAvailable(pet, request, null);
-        return ReservationResponse.from(reservationRepository.save(
-                new Reservation(pet, request.checkInDate(), request.checkOutDate(), normalize(request.notes()))));
+        var price = pricingService.calculate(request.checkInDate(), request.checkOutDate());
+        var reservation = reservationRepository.save(new Reservation(pet, request.checkInDate(), request.checkOutDate(),
+                normalize(request.notes()), price.totalAmount()));
+        paymentRepository.save(new Payment(reservation, price.totalAmount(), PaymentMethod.PIX));
+        return ReservationResponse.from(reservation);
     }
 
-    public List<ReservationResponse> list(AppUser owner) {
-        return reservationRepository.findAllByPetOwnerIdOrderByCheckInDateAsc(owner.getId()).stream()
-                .map(ReservationResponse::from).toList();
+    public List<ReservationResponse> list(AppUser user) {
+        var reservations = user.isAdmin()
+                ? reservationRepository.findAllByOrderByCheckInDateAsc()
+                : reservationRepository.findAllByPetOwnerIdOrderByCheckInDateAsc(user.getId());
+        return reservations.stream().map(ReservationResponse::from).toList();
     }
 
-    public ReservationResponse get(AppUser owner, Long id) {
-        return ReservationResponse.from(findOwnedReservation(owner, id));
+    public ReservationResponse get(AppUser user, Long id) {
+        return ReservationResponse.from(findAccessibleReservation(user, id));
     }
 
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
@@ -46,7 +60,19 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O pet da reserva não pode ser alterado");
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
+        var price = pricingService.calculate(request.checkInDate(), request.checkOutDate());
+        paymentRepository.findByReservationId(reservation.getId()).ifPresent(payment -> {
+            if (payment.getStatus() == PaymentStatus.PAID) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Uma reserva com pagamento confirmado não pode ter as datas alteradas");
+            }
+            if (payment.getStatus() == PaymentStatus.PENDING) {
+                payment.updateAmount(price.totalAmount());
+                paymentRepository.save(payment);
+            }
+        });
         reservation.update(request.checkInDate(), request.checkOutDate(), normalize(request.notes()));
+        reservation.updateTotalAmount(price.totalAmount());
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
 
@@ -80,6 +106,14 @@ public class ReservationService {
     private Reservation findOwnedReservation(AppUser owner, Long id) {
         return reservationRepository.findByIdAndPetOwnerId(id, owner.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva não encontrada"));
+    }
+
+    private Reservation findAccessibleReservation(AppUser user, Long id) {
+        if (user.isAdmin()) {
+            return reservationRepository.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva não encontrada"));
+        }
+        return findOwnedReservation(user, id);
     }
 
     private String normalize(String value) {

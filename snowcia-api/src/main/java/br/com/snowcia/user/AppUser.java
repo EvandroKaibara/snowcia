@@ -80,6 +80,14 @@ public class AppUser implements UserDetails {
         return email;
     }
 
+    public String getRoleName() {
+        return role.getName();
+    }
+
+    public boolean isAdmin() {
+        return "ADMIN".equals(role.getName());
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.getName()));

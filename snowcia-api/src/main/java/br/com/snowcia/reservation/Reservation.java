@@ -2,6 +2,7 @@ package br.com.snowcia.reservation;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 import br.com.snowcia.pet.Pet;
 import jakarta.persistence.Column;
@@ -49,12 +50,16 @@ public class Reservation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalAmount;
+
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, LocalDate checkInDate, LocalDate checkOutDate, String notes) {
+    public Reservation(Pet pet, LocalDate checkInDate, LocalDate checkOutDate, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
+        this.totalAmount = totalAmount;
         update(checkInDate, checkOutDate, notes);
     }
 
@@ -62,6 +67,10 @@ public class Reservation {
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
         this.notes = notes;
+    }
+
+    public void updateTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
     }
 
     @PrePersist
@@ -81,4 +90,5 @@ public class Reservation {
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public ReservationStatus getStatus() { return status; }
     public String getNotes() { return notes; }
+    public BigDecimal getTotalAmount() { return totalAmount; }
 }

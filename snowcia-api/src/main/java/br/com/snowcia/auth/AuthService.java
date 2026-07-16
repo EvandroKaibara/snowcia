@@ -43,13 +43,13 @@ public class AuthService {
                         "Papel CLIENT não encontrado"));
         var user = new AppUser(request.name().trim(), email, passwordEncoder.encode(request.password()), clientRole);
         userRepository.save(user);
-        return new AuthResponse(jwtService.generateToken(user), "Bearer");
+        return new AuthResponse(jwtService.generateToken(user), "Bearer", user.getRoleName());
     }
 
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(request.email().trim().toLowerCase(), request.password()));
         var user = (AppUser) authentication.getPrincipal();
-        return new AuthResponse(jwtService.generateToken(user), "Bearer");
+        return new AuthResponse(jwtService.generateToken(user), "Bearer", user.getRoleName());
     }
 }
