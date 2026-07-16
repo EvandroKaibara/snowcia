@@ -41,7 +41,7 @@ public class AuthService {
         var clientRole = roleRepository.findByName("CLIENT")
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                         "Papel CLIENT não encontrado"));
-        var user = new AppUser(request.name().trim(), email, passwordEncoder.encode(request.password()), clientRole);
+        var user = new AppUser(request.name().trim(), email, request.phone().trim(), passwordEncoder.encode(request.password()), clientRole);
         userRepository.save(user);
         return new AuthResponse(jwtService.generateToken(user), "Bearer", user.getRoleName());
     }

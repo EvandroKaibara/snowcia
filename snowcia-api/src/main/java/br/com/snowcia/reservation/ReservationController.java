@@ -3,6 +3,7 @@ package br.com.snowcia.reservation;
 import java.util.List;
 
 import br.com.snowcia.reservation.dto.ReservationRequest;
+import br.com.snowcia.reservation.dto.DeclineReservationRequest;
 import br.com.snowcia.reservation.dto.ReservationResponse;
 import br.com.snowcia.user.AppUser;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -48,6 +50,17 @@ public class ReservationController {
     public ReservationResponse update(@AuthenticationPrincipal AppUser user, @PathVariable Long id,
             @Valid @RequestBody ReservationRequest request) {
         return reservationService.update(user, id, request);
+    }
+
+    @PatchMapping("/{id}/approve")
+    public ReservationResponse approve(@AuthenticationPrincipal AppUser user, @PathVariable Long id) {
+        return reservationService.approve(user, id);
+    }
+
+    @PatchMapping("/{id}/decline")
+    public ReservationResponse decline(@AuthenticationPrincipal AppUser user, @PathVariable Long id,
+            @Valid @RequestBody DeclineReservationRequest request) {
+        return reservationService.decline(user, id, request);
     }
 
     @DeleteMapping("/{id}")

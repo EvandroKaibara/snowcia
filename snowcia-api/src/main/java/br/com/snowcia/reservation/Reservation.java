@@ -41,8 +41,15 @@ public class Reservation {
     @Column(nullable = false, length = 30)
     private ReservationStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_type", nullable = false, length = 30)
+    private ReservationServiceType serviceType;
+
     @Column(length = 500)
     private String notes;
+
+    @Column(name = "decline_reason", length = 500)
+    private String declineReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -56,9 +63,11 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, LocalDate checkInDate, LocalDate checkOutDate, String notes, BigDecimal totalAmount) {
+    public Reservation(Pet pet, ReservationServiceType serviceType, LocalDate checkInDate, LocalDate checkOutDate,
+            String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
+        this.serviceType = serviceType;
         this.totalAmount = totalAmount;
         update(checkInDate, checkOutDate, notes);
     }
@@ -71,6 +80,20 @@ public class Reservation {
 
     public void updateTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
+    }
+
+    public void approve() {
+        status = ReservationStatus.AWAITING_PAYMENT;
+        declineReason = null;
+    }
+
+    public void confirm() {
+        status = ReservationStatus.CONFIRMED;
+    }
+
+    public void decline(String reason) {
+        status = ReservationStatus.DECLINED;
+        declineReason = reason;
     }
 
     @PrePersist
@@ -89,6 +112,8 @@ public class Reservation {
     public LocalDate getCheckInDate() { return checkInDate; }
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public ReservationStatus getStatus() { return status; }
+    public ReservationServiceType getServiceType() { return serviceType; }
     public String getNotes() { return notes; }
+    public String getDeclineReason() { return declineReason; }
     public BigDecimal getTotalAmount() { return totalAmount; }
 }

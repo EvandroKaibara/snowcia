@@ -87,6 +87,10 @@ public class Pet {
         return species;
     }
 
+    public AppUser getOwner() {
+        return owner;
+    }
+
     public String getBreed() {
         return breed;
     }

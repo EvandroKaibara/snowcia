@@ -29,7 +29,7 @@ public class DevelopmentAdminBootstrap {
             }
             var adminRole = roleRepository.findByName("ADMIN")
                     .orElseThrow(() -> new IllegalStateException("Perfil ADMIN não encontrado"));
-            userRepository.save(new AppUser(name, email, passwordEncoder.encode(password), adminRole));
+        userRepository.save(new AppUser(name, email, null, passwordEncoder.encode(password), adminRole));
         };
     }
 }

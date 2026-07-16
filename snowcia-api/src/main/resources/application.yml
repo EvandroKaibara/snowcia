@@ -9,3 +9,6 @@ snowcia:
   pricing:
     # Datas no formato YYYY-MM-DD, separadas por vírgula. Elas recebem a diária de feriado (R$ 75,00).
     holiday-dates: ${SNOWCIA_PRICING_HOLIDAY_DATES:}
+  whatsapp:
+    # Endpoint do provedor, que recebe {"to":"5511...","message":"..."}. Deixe vazio para registrar apenas no log local.
+    webhook-url: ${SNOWCIA_WHATSAPP_WEBHOOK_URL:}
