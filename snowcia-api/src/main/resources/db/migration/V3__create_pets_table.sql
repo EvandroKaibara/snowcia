@@ -1,0 +1,12 @@
+CREATE TABLE pets (
+    id BIGSERIAL PRIMARY KEY,
+    owner_id BIGINT NOT NULL REFERENCES users(id),
+    name VARCHAR(100) NOT NULL,
+    species VARCHAR(30) NOT NULL,
+    breed VARCHAR(100),
+    birth_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pets_owner_id ON pets(owner_id);
