@@ -43,6 +43,18 @@ public class Pet {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Column(length = 20) private String gender;
+    @Column(name = "neutered") private Boolean neutered;
+    @Column(name = "vaccinations_current") private Boolean vaccinationsCurrent;
+    @Column(name = "flea_prevention_current") private Boolean fleaPreventionCurrent;
+    @Column(length = 500) private String healthConditions;
+    @Column(length = 500) private String specialCare;
+    @Column(length = 500) private String allergies;
+    @Column(name = "human_social", length = 100) private String humanSocial;
+    @Column(name = "pet_social", length = 100) private String petSocial;
+    @Column(name = "important_habits", length = 500) private String importantHabits;
+    @Column(length = 500) private String observations;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -52,16 +64,19 @@ public class Pet {
     protected Pet() {
     }
 
-    public Pet(AppUser owner, String name, PetSpecies species, String breed, LocalDate birthDate) {
+    public Pet(AppUser owner, String name, PetSpecies species, String breed, LocalDate birthDate, String gender,
+            Boolean neutered, Boolean vaccinationsCurrent, Boolean fleaPreventionCurrent, String healthConditions,
+            String specialCare, String allergies, String humanSocial, String petSocial, String importantHabits, String observations) {
         this.owner = owner;
-        update(name, species, breed, birthDate);
+        update(name, species, breed, birthDate, gender, neutered, vaccinationsCurrent, fleaPreventionCurrent, healthConditions, specialCare, allergies, humanSocial, petSocial, importantHabits, observations);
     }
 
-    public void update(String name, PetSpecies species, String breed, LocalDate birthDate) {
+    public void update(String name, PetSpecies species, String breed, LocalDate birthDate, String gender, Boolean neutered, Boolean vaccinationsCurrent, Boolean fleaPreventionCurrent, String healthConditions, String specialCare, String allergies, String humanSocial, String petSocial, String importantHabits, String observations) {
         this.name = name;
         this.species = species;
         this.breed = breed;
         this.birthDate = birthDate;
+        this.gender = gender; this.neutered = neutered; this.vaccinationsCurrent = vaccinationsCurrent; this.fleaPreventionCurrent = fleaPreventionCurrent; this.healthConditions = healthConditions; this.specialCare = specialCare; this.allergies = allergies; this.humanSocial = humanSocial; this.petSocial = petSocial; this.importantHabits = importantHabits; this.observations = observations;
     }
 
     @PrePersist
@@ -98,4 +113,15 @@ public class Pet {
     public LocalDate getBirthDate() {
         return birthDate;
     }
+    public String getGender() { return gender; }
+    public Boolean getNeutered() { return neutered; }
+    public Boolean getVaccinationsCurrent() { return vaccinationsCurrent; }
+    public Boolean getFleaPreventionCurrent() { return fleaPreventionCurrent; }
+    public String getHealthConditions() { return healthConditions; }
+    public String getSpecialCare() { return specialCare; }
+    public String getAllergies() { return allergies; }
+    public String getHumanSocial() { return humanSocial; }
+    public String getPetSocial() { return petSocial; }
+    public String getImportantHabits() { return importantHabits; }
+    public String getObservations() { return observations; }
 }

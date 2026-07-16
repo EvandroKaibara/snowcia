@@ -129,8 +129,9 @@ public class ReservationService {
     }
 
     private void validateServiceForPet(Pet pet, ReservationServiceType serviceType) {
-        if (pet.getSpecies() == PetSpecies.DOG && serviceType.name().startsWith("CAT_SITTER")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CatSitter está disponível somente para gatos");
+        boolean catSitter = serviceType.name().startsWith("CAT_SITTER");
+        if ((pet.getSpecies() == PetSpecies.DOG && catSitter) || (pet.getSpecies() == PetSpecies.CAT && !catSitter)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O serviço selecionado não é compatível com a espécie do pet");
         }
     }
 

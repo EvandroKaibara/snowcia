@@ -1,0 +1,11 @@
+ALTER TABLE pets ADD COLUMN gender VARCHAR(20);
+ALTER TABLE pets ADD COLUMN neutered BOOLEAN;
+ALTER TABLE pets ADD COLUMN vaccinations_current BOOLEAN;
+ALTER TABLE pets ADD COLUMN flea_prevention_current BOOLEAN;
+ALTER TABLE pets ADD COLUMN health_conditions VARCHAR(500);
+ALTER TABLE pets ADD COLUMN special_care VARCHAR(500);
+ALTER TABLE pets ADD COLUMN allergies VARCHAR(500);
+ALTER TABLE pets ADD COLUMN human_social VARCHAR(100);
+ALTER TABLE pets ADD COLUMN pet_social VARCHAR(100);
+ALTER TABLE pets ADD COLUMN important_habits VARCHAR(500);
+ALTER TABLE pets ADD COLUMN observations VARCHAR(500);
