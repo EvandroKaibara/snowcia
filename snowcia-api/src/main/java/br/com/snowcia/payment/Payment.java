@@ -70,6 +70,10 @@ public class Payment {
         paidAt = null;
     }
 
+    public void updateAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();

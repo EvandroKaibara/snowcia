@@ -4,3 +4,8 @@ spring:
 
   profiles:
     active: dev
+
+snowcia:
+  pricing:
+    # Datas no formato YYYY-MM-DD, separadas por vírgula. Elas recebem a diária de feriado (R$ 75,00).
+    holiday-dates: ${SNOWCIA_PRICING_HOLIDAY_DATES:}

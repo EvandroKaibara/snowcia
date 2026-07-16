@@ -1,4 +1,4 @@
 package br.com.snowcia.auth.dto;
 
-public record AuthResponse(String token, String tokenType) {
+public record AuthResponse(String token, String tokenType, String role) {
 }
