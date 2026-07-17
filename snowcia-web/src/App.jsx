@@ -585,7 +585,7 @@ function Profile({ profile, onSave }) {
       const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const data = await response.json();
       if (data.erro) throw new Error();
-      const address = [data.logradouro, data.bairro, [data.localidade, data.uf].filter(Boolean).join(" - "), `CEP ${formatCep(digits)}`].filter(Boolean).join(", ");
+      const address = data.logradouro ?? "";
       setForm({ ...form, address }); setCep(formatCep(digits)); setCepError("");
     } catch { setCepError("CEP não encontrado. Confira e tente novamente."); }
   };
