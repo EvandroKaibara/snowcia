@@ -3,6 +3,8 @@ package br.com.snowcia.payment;
 import java.util.List;
 
 import br.com.snowcia.payment.dto.PaymentResponse;
+import br.com.snowcia.user.AppUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,23 +22,23 @@ public class PaymentController {
     }
 
     @GetMapping
-    public List<PaymentResponse> list() {
-        return paymentService.list();
+    public List<PaymentResponse> list(@AuthenticationPrincipal AppUser user) {
+        return paymentService.list(user);
     }
 
     @GetMapping("/{id}")
-    public PaymentResponse get(@PathVariable Long id) {
-        return paymentService.get(id);
+    public PaymentResponse get(@AuthenticationPrincipal AppUser user, @PathVariable Long id) {
+        return paymentService.get(user, id);
     }
 
     @PatchMapping("/{id}/confirm")
-    public PaymentResponse confirm(@PathVariable Long id) {
-        return paymentService.markAsPaid(id);
+    public PaymentResponse confirm(@AuthenticationPrincipal AppUser user, @PathVariable Long id) {
+        return paymentService.markAsPaid(user, id);
     }
 
     @PatchMapping("/{id}/cancel")
-    public PaymentResponse cancel(@PathVariable Long id) {
-        return paymentService.cancel(id);
+    public PaymentResponse cancel(@AuthenticationPrincipal AppUser user, @PathVariable Long id) {
+        return paymentService.cancel(user, id);
     }
-    @PatchMapping("/{id}/pending") public PaymentResponse pending(@PathVariable Long id) { return paymentService.markAsPending(id); }
+    @PatchMapping("/{id}/pending") public PaymentResponse pending(@AuthenticationPrincipal AppUser user, @PathVariable Long id) { return paymentService.markAsPending(user, id); }
 }
