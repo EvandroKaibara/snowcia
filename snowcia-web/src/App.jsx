@@ -614,24 +614,6 @@ function Reservations({
     : [["ALL", "Minhas solicitações"]];
   return (
     <>
-      {!isAdmin && (
-        <section className="list-card service-catalog">
-          <SectionHeading
-            title="Catálogo de serviços"
-            action="Solicitar serviço"
-            disabled={!pets.length}
-            onAction={() => openEditor({ type: "reservation" })}
-          />
-          <div className="catalog-grid">
-            {services.map(([id, name, price]) => (
-              <div key={id}>
-                <strong>{name}</strong>
-                <small>{price}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
       {groups.map(([status, title]) => {
         const rows =
           status === "ALL"
@@ -639,7 +621,7 @@ function Reservations({
             : reservations.filter((r) => r.status === status);
         return (
           <section className="list-card reservation-section" key={status}>
-            <SectionTitle title={title} />
+            <SectionHeading title={title} action={!isAdmin ? "Solicitar serviço" : null} disabled={!pets.length} onAction={() => openEditor({ type: "reservation" })} />
             {rows.length ? (
               rows.map((r) => (
                 <ReservationDetail
@@ -988,9 +970,7 @@ function SectionHeading({ title, action, onAction, disabled }) {
         <p className="eyebrow">GERENCIE</p>
         <h2>{title}</h2>
       </div>
-      <button className="add-button" disabled={disabled} onClick={onAction}>
-        + {action}
-      </button>
+      {action && <button className="add-button" disabled={disabled} onClick={onAction}>+ {action}</button>}
     </div>
   );
 }
