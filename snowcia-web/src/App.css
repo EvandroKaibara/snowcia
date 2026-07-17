@@ -46,3 +46,7 @@
 .small-action { padding: 8px; background: #edf3ff; color: var(--ocean); font-size: 11px; }
 .small-action.danger { background: #fff0ed; color: #b42318; }
 @media (max-width: 520px) { .form-columns { grid-template-columns: 1fr; gap: 0; }.price-condition { grid-template-columns: minmax(0, 1fr) 100px 30px; } }
+.price-preview { display: grid; gap: 3px; margin: 18px 0 8px; padding: 14px 15px; border: 1px solid #d4e0ff; border-radius: 12px; background: #edf3ff; color: var(--ocean); }
+.price-preview span { font-size: 11px; font-weight: 800; letter-spacing: .35px; text-transform: uppercase; }
+.price-preview strong { font-size: 22px; }
+.price-preview small { color: var(--muted); font-size: 11px; line-height: 1.4; }

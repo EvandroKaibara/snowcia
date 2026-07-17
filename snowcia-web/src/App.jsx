@@ -779,6 +779,8 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
           serviceOfferingId: "",
         });
   const [form, setForm] = useState(initial);
+  const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
+  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate);
   return (
     <div className="modal-backdrop">
       <form
@@ -908,6 +910,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </Field>
+            {estimatedAmount != null && <div className="price-preview"><span>Valor estimado da reserva</span><strong>{formatCurrency(estimatedAmount)}</strong><small>O valor considera as condições de preço cadastradas para cada dia.</small></div>}
           </>
         )}
         <button className="primary-button" disabled={loading}>
@@ -1012,6 +1015,30 @@ function labelOf(v) {
 }
 function serviceName(id) {
   return services.find(([key]) => key === id)?.[1] ?? id;
+}
+function calculateOfferingAmount(service, checkInDate, checkOutDate) {
+  if (!service || !checkInDate || !checkOutDate || checkOutDate <= checkInDate) return null;
+  const conditions = service.priceConditions ?? [];
+  if (!conditions.length) return null;
+  const priceFor = (date) => Number((conditions.find((condition) => conditionMatchesDay(condition.name, date.getDay())) ?? conditions[0]).price);
+  const firstDay = new Date(`${checkInDate}T12:00:00`);
+  if (service.billingType === "FIXED" || service.billingType === "PER_WALK") return priceFor(firstDay);
+  let total = 0;
+  for (let day = firstDay; day < new Date(`${checkOutDate}T12:00:00`); day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) total += priceFor(day);
+  return total;
+}
+function conditionMatchesDay(name = "", day) {
+  const condition = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (condition.includes("fim de semana") || condition.includes("weekend")) return day === 0 || day === 6;
+  if (condition.includes("segunda") && condition.includes("quinta")) return day >= 1 && day <= 4;
+  if (condition.includes("dia util") || condition.includes("weekday")) return day >= 1 && day <= 5;
+  return ((condition.includes("segunda") || condition.includes("monday")) && day === 1)
+    || ((condition.includes("terca") || condition.includes("tuesday")) && day === 2)
+    || ((condition.includes("quarta") || condition.includes("wednesday")) && day === 3)
+    || ((condition.includes("quinta") || condition.includes("thursday")) && day === 4)
+    || ((condition.includes("sexta") || condition.includes("friday")) && day === 5)
+    || ((condition.includes("sabado") || condition.includes("saturday")) && day === 6)
+    || ((condition.includes("domingo") || condition.includes("sunday")) && day === 0);
 }
 function formatDate(v) {
   return new Intl.DateTimeFormat("pt-BR", {

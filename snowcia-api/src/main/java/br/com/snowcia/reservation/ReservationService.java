@@ -195,13 +195,13 @@ public class ReservationService {
         if (condition.contains("dia util") || condition.contains("weekday")) {
             return day.getValue() <= DayOfWeek.FRIDAY.getValue();
         }
-        if (condition.contains("segunda") || condition.contains("monday")) return day == DayOfWeek.MONDAY;
-        if (condition.contains("terca") || condition.contains("tuesday")) return day == DayOfWeek.TUESDAY;
-        if (condition.contains("quarta") || condition.contains("wednesday")) return day == DayOfWeek.WEDNESDAY;
-        if (condition.contains("quinta") || condition.contains("thursday")) return day == DayOfWeek.THURSDAY;
-        if (condition.contains("sexta") || condition.contains("friday")) return day == DayOfWeek.FRIDAY;
-        if (condition.contains("sabado") || condition.contains("saturday")) return day == DayOfWeek.SATURDAY;
-        return (condition.contains("domingo") || condition.contains("sunday")) && day == DayOfWeek.SUNDAY;
+        return ((condition.contains("segunda") || condition.contains("monday")) && day == DayOfWeek.MONDAY)
+                || ((condition.contains("terca") || condition.contains("tuesday")) && day == DayOfWeek.TUESDAY)
+                || ((condition.contains("quarta") || condition.contains("wednesday")) && day == DayOfWeek.WEDNESDAY)
+                || ((condition.contains("quinta") || condition.contains("thursday")) && day == DayOfWeek.THURSDAY)
+                || ((condition.contains("sexta") || condition.contains("friday")) && day == DayOfWeek.FRIDAY)
+                || ((condition.contains("sabado") || condition.contains("saturday")) && day == DayOfWeek.SATURDAY)
+                || ((condition.contains("domingo") || condition.contains("sunday")) && day == DayOfWeek.SUNDAY);
     }
 
     private void ensureAvailable(Pet pet, ReservationRequest request, Long reservationId) {
