@@ -15,3 +15,17 @@
 @media (max-width: 760px) { .auth-shell { grid-template-columns: 1fr; }.brand-panel { min-height: 380px; padding: 32px; }.hero-copy { margin: 55px 0; }.hero-copy h1 { font-size: 45px; }.decorative-card { display: none; }.auth-panel { padding: 52px 25px; }.app-shell { grid-template-columns: 1fr; }.sidebar { padding: 18px; }.sidebar nav { margin: 20px 0 0; grid-template-columns: repeat(2, 1fr); }.logout { display: none; }.content { padding: 30px 20px; }.stats { grid-template-columns: 1fr; }.welcome { padding: 25px; }.welcome-pet { display: none; } }
 .modal-backdrop { overflow-y: auto; align-items: start; }
 .editor-modal { max-height: calc(100vh - 40px); overflow-y: auto; margin: auto; }
+.admin-pet-card { display: flex; flex-direction: column; min-height: 218px; }
+.admin-pet-card .card-meta { margin-top: 8px; line-height: 1.45; }
+.card-more { width: 100%; margin-top: auto; padding: 10px 12px; border: 1px solid var(--ocean); border-radius: 10px; background: var(--ocean); color: var(--white); font-size: 12px; font-weight: 800; letter-spacing: .1px; cursor: pointer; box-shadow: 0 5px 12px rgba(10,22,128,.17); transition: transform .18s ease, background .18s ease, box-shadow .18s ease; }
+.card-more:hover { background: var(--orange); border-color: var(--orange); color: var(--ocean); transform: translateY(-2px); box-shadow: 0 9px 17px rgba(10,22,128,.22); }
+.card-more:focus-visible { outline: 3px solid rgba(147,178,248,.7); outline-offset: 2px; }
+.row-more { width: auto; min-width: 106px; margin: 0 0 0 auto; }
+.details-modal { width: min(100%, 720px); }
+.detail-subtitle { margin: -8px 0 19px; color: var(--muted); font-size: 13px; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.detail-item { min-width: 0; padding: 11px 12px; border: 1px solid #e4ebfa; border-radius: 10px; background: #f9fbff; }
+.detail-item strong, .detail-item span { display: block; }
+.detail-item strong { margin-bottom: 4px; color: var(--muted); font-size: 10px; letter-spacing: .35px; text-transform: uppercase; }
+.detail-item span { color: var(--ink); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .detail-grid { grid-template-columns: 1fr; } }
