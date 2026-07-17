@@ -940,7 +940,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </Field>
-            {estimatedAmount != null && <div className="price-preview"><span>Valor estimado da reserva</span><strong>{formatCurrency(estimatedAmount)}</strong><small>{isDaycare ? "O Day Care inclui até 12 horas; cada hora ou fração excedente soma R$ 5,00." : "O valor considera as condições de preço cadastradas para cada dia."}</small></div>}
+            {estimatedAmount != null && <div className="price-preview"><span>Valor estimado da reserva</span><strong>{formatCurrency(estimatedAmount)}</strong><small>{isDaycare ? `O ${isHalfDayCareService(selectedOffering) ? "Day Care meio período inclui até 6 horas" : "Day Care inclui até 12 horas"}; cada hora ou fração excedente soma R$ 5,00.` : "O valor considera as condições de preço cadastradas para cada dia."}</small></div>}
           </>
         )}
         <button className="primary-button" disabled={loading}>
@@ -1054,6 +1054,10 @@ function isDayCareService(service) {
   const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   return service?.category === "DAYCARE" || name.includes("daycare") || name.includes("day care");
 }
+function isHalfDayCareService(service) {
+  const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return name.includes("meio periodo") || name.includes("half day");
+}
 function isDayCareReservation(reservation) {
   return String(reservation?.serviceType ?? "").startsWith("DAYCARE") || isDayCareService({ name: reservation?.serviceName });
 }
@@ -1068,7 +1072,8 @@ function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime
   if (isDayCareService(service)) {
     const start = new Date(`${checkInDate}T${checkInTime}:00`);
     const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
-    const overtimeHours = Math.max(0, Math.ceil(((end - start) / 60000 - 720) / 60));
+    const includedMinutes = isHalfDayCareService(service) ? 360 : 720;
+    const overtimeHours = Math.max(0, Math.ceil(((end - start) / 60000 - includedMinutes) / 60));
     total = priceFor(firstDay) + overtimeHours * 5;
   } else if (service.billingType === "DAILY") {
     const start = new Date(`${checkInDate}T${checkInTime}:00`);

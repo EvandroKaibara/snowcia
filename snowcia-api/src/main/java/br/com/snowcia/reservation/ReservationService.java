@@ -178,7 +178,7 @@ public class ReservationService {
     }
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime) {
-        if (isDaycare(offering)) return priceForDate(offering, checkIn).add(daycareOvertime(checkIn, checkInTime, checkOut, checkOutTime));
+        if (isDaycare(offering)) return priceForDate(offering, checkIn).add(daycareOvertime(offering, checkIn, checkInTime, checkOut, checkOutTime));
         if (offering.getBillingType() == br.com.snowcia.offering.BillingType.DAILY) {
             var minutes = Duration.between(LocalDateTime.of(checkIn, checkInTime), LocalDateTime.of(checkOut, checkOutTime)).toMinutes();
             var dailyCount = Math.max(1, (minutes + 1439) / 1440);
@@ -205,10 +205,15 @@ public class ReservationService {
         return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.DAYCARE || name.contains("daycare") || name.contains("day care");
     }
 
-    private BigDecimal daycareOvertime(LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
+    private BigDecimal daycareOvertime(ServiceOffering offering, LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
         var minutes = Duration.between(LocalDateTime.of(checkIn, checkInTime), LocalDateTime.of(checkOut, checkOutTime)).toMinutes();
-        var overtimeHours = Math.max(0, (minutes - 720 + 59) / 60);
+        var overtimeHours = Math.max(0, (minutes - includedDaycareMinutes(offering) + 59) / 60);
         return BigDecimal.valueOf(overtimeHours).multiply(BigDecimal.valueOf(5));
+    }
+
+    private int includedDaycareMinutes(ServiceOffering offering) {
+        var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return name.contains("meio periodo") || name.contains("half day") ? 360 : 720;
     }
 
     private BigDecimal calculateExtrasPrice(ServiceOffering offering, ReservationRequest request) {
