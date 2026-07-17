@@ -1,6 +1,10 @@
 package br.com.snowcia.reservation;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.text.Normalizer;
 
 import br.com.snowcia.notification.WhatsAppNotificationService;
 import br.com.snowcia.offering.ServiceOffering;
@@ -52,7 +56,7 @@ public class ReservationService {
         var offering = findOffering(pet, request.serviceOfferingId());
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : offering.getPriceConditions().getFirst().getPrice();
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate());
         var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
@@ -80,7 +84,7 @@ public class ReservationService {
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         validateServiceForPet(reservation.getPet(), request.serviceType());
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : offering.getPriceConditions().getFirst().getPrice();
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate());
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateService(request.serviceType(), offering);
         reservation.updateTotalAmount(price);
@@ -157,6 +161,47 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Serviço indisponível para este pet");
         }
         return offering;
+    }
+
+    private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut) {
+        if (offering.getBillingType() == br.com.snowcia.offering.BillingType.FIXED
+                || offering.getBillingType() == br.com.snowcia.offering.BillingType.PER_WALK) {
+            return priceForDate(offering, checkIn);
+        }
+        var total = BigDecimal.ZERO;
+        for (var day = checkIn; day.isBefore(checkOut); day = day.plusDays(1)) {
+            total = total.add(priceForDate(offering, day));
+        }
+        return total;
+    }
+
+    private BigDecimal priceForDate(ServiceOffering offering, LocalDate date) {
+        return offering.getPriceConditions().stream()
+                .filter(condition -> appliesTo(condition.getName(), date.getDayOfWeek()))
+                .findFirst()
+                .orElse(offering.getPriceConditions().getFirst())
+                .getPrice();
+    }
+
+    private boolean appliesTo(String conditionName, DayOfWeek day) {
+        var condition = Normalizer.normalize(conditionName, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+        if (condition.contains("fim de semana") || condition.contains("weekend")) {
+            return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+        }
+        if (condition.contains("segunda") && condition.contains("quinta")) {
+            return day.getValue() >= DayOfWeek.MONDAY.getValue() && day.getValue() <= DayOfWeek.THURSDAY.getValue();
+        }
+        if (condition.contains("dia util") || condition.contains("weekday")) {
+            return day.getValue() <= DayOfWeek.FRIDAY.getValue();
+        }
+        if (condition.contains("segunda") || condition.contains("monday")) return day == DayOfWeek.MONDAY;
+        if (condition.contains("terca") || condition.contains("tuesday")) return day == DayOfWeek.TUESDAY;
+        if (condition.contains("quarta") || condition.contains("wednesday")) return day == DayOfWeek.WEDNESDAY;
+        if (condition.contains("quinta") || condition.contains("thursday")) return day == DayOfWeek.THURSDAY;
+        if (condition.contains("sexta") || condition.contains("friday")) return day == DayOfWeek.FRIDAY;
+        if (condition.contains("sabado") || condition.contains("saturday")) return day == DayOfWeek.SATURDAY;
+        return (condition.contains("domingo") || condition.contains("sunday")) && day == DayOfWeek.SUNDAY;
     }
 
     private void ensureAvailable(Pet pet, ReservationRequest request, Long reservationId) {
