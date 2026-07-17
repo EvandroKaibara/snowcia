@@ -781,7 +781,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
-  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate);
+  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime);
   return (
     <div className="modal-backdrop">
       <form
@@ -1017,12 +1017,18 @@ function labelOf(v) {
 function serviceName(id) {
   return services.find(([key]) => key === id)?.[1] ?? id;
 }
-function calculateOfferingAmount(service, checkInDate, checkOutDate) {
+function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00") {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;
   const conditions = service.priceConditions ?? [];
   if (!conditions.length) return null;
   const priceFor = (date) => Number((conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
   const firstDay = new Date(`${checkInDate}T12:00:00`);
+  if (service.billingType === "DAILY") {
+    const start = new Date(`${checkInDate}T${checkInTime}:00`);
+    const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
+    const dailyCount = Math.max(1, Math.ceil((end - start) / 86400000));
+    return Array.from({ length: dailyCount }, (_, index) => priceFor(new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index, 12))).reduce((total, price) => total + price, 0);
+  }
   let total = 0;
   const isCatSitter = service.category === "CAT_SITTER" || service.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("cat sitter");
   const lastChargeableDay = (checkOutDate === checkInDate || isCatSitter) ? new Date(new Date(`${checkOutDate}T12:00:00`).getFullYear(), new Date(`${checkOutDate}T12:00:00`).getMonth(), new Date(`${checkOutDate}T12:00:00`).getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);

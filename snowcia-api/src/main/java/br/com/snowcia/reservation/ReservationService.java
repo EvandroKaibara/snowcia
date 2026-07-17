@@ -3,7 +3,9 @@ package br.com.snowcia.reservation;
 import java.util.List;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.text.Normalizer;
 
 import br.com.snowcia.notification.WhatsAppNotificationService;
@@ -56,7 +58,7 @@ public class ReservationService {
         var offering = findOffering(pet, request.serviceOfferingId());
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate());
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
         var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
@@ -84,7 +86,7 @@ public class ReservationService {
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         validateServiceForPet(reservation.getPet(), request.serviceType());
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate());
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateService(request.serviceType(), offering);
         reservation.updateTotalAmount(price);
@@ -163,7 +165,14 @@ public class ReservationService {
         return offering;
     }
 
-    private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut) {
+    private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime) {
+        if (offering.getBillingType() == br.com.snowcia.offering.BillingType.DAILY) {
+            var minutes = Duration.between(LocalDateTime.of(checkIn, checkInTime), LocalDateTime.of(checkOut, checkOutTime)).toMinutes();
+            var dailyCount = Math.max(1, (minutes + 1439) / 1440);
+            var total = BigDecimal.ZERO;
+            for (int index = 0; index < dailyCount; index++) total = total.add(priceForDate(offering, checkIn.plusDays(index)));
+            return total;
+        }
         var total = BigDecimal.ZERO;
         var lastChargeableDay = (checkOut.equals(checkIn) || isCatSitter(offering)) ? checkOut.plusDays(1) : checkOut;
         for (var day = checkIn; day.isBefore(lastChargeableDay); day = day.plusDays(1)) {
