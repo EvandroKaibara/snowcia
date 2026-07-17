@@ -889,7 +889,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             })()}
             <Field label="Administradora responsável">
               <select required value={form.assignedAdminId ?? ""} onChange={(e) => setForm({ ...form, assignedAdminId: e.target.value })}>
-                <option value="" disabled>Selecione Jussara ou Isabella</option>
+                <option value="" disabled>Selecione o responsável</option>
                 {reservationAdministrators.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
               </select>
               {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
