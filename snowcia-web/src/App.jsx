@@ -136,7 +136,9 @@ function App() {
       const payload = await response.json();
       if (!response.ok)
         throw new Error(
-          payload.message ?? "Não foi possível acessar sua conta.",
+          !isRegistering && [401, 403].includes(response.status)
+            ? "Usuário ou senha incorretos."
+            : payload.message ?? "Não foi possível acessar sua conta.",
         );
       const nextRole = payload.role ?? "CLIENT";
       localStorage.setItem("snowcia_token", payload.token);
