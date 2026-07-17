@@ -677,6 +677,7 @@ function ReservationDetail({
   onApprove,
   onDecline,
 }) {
+  const isDaycare = isDayCareReservation(reservation);
   return (
     <div className="reservation-row detailed">
       <div className="pet-dot">🐾</div>
@@ -684,13 +685,7 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>
-          {formatDate(reservation.checkInDate)}{" "}
-          {formatTime(reservation.checkInTime)} —{" "}
-          {formatDate(reservation.checkOutDate)}{" "}
-          {formatTime(reservation.checkOutTime)} ·{" "}
-          {formatCurrency(reservation.totalAmount)}
-        </small>
+        <small>{isDaycare ? <>{formatDate(reservation.checkInDate)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</> : <>{formatDate(reservation.checkInDate)} {formatTime(reservation.checkInTime)} — {formatDate(reservation.checkOutDate)} {formatTime(reservation.checkOutTime)}</>} · {formatCurrency(reservation.totalAmount)}</small>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -781,8 +776,9 @@ function ServiceOfferings({ services, openEditor, onAction }) {
 function ServiceEditor({ editor, onClose, onSave, loading }) {
   const initial = editor.item ?? { name: "", description: "", category: "OTHER", target: "DOG", billingType: "DAILY", durationMinutes: "", durationUnit: "MINUTES", active: true, allowDateSelection: true, allowTimeSelection: false, allowCustomerNotes: true, allowCheckInOut: false, maxPets: "", priceConditions: [{ name: "Segunda a quinta", price: "" }] };
   const [form, setForm] = useState(initial);
+  const isDaycare = isDayCareService(form);
   const updateCondition = (index, key, value) => setForm({ ...form, priceConditions: form.priceConditions.map((condition, i) => i === index ? { ...condition, [key]: value } : condition) });
-  const submit = (event) => { event.preventDefault(); onSave({ ...form, category: form.category ?? "OTHER", allowTimeSelection: false, durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null, durationUnit: form.durationUnit ?? "MINUTES", maxPets: form.maxPets ? Number(form.maxPets) : null, priceConditions: form.priceConditions.map((condition) => ({ ...condition, price: Number(condition.price) })) }); };
+  const submit = (event) => { event.preventDefault(); onSave({ ...form, category: form.category ?? "OTHER", allowDateSelection: isDaycare ? true : form.allowDateSelection, allowCheckInOut: isDaycare ? true : form.allowCheckInOut, allowTimeSelection: false, durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null, durationUnit: form.durationUnit ?? "MINUTES", maxPets: form.maxPets ? Number(form.maxPets) : null, priceConditions: form.priceConditions.map((condition) => ({ ...condition, price: Number(condition.price) })) }); };
   return <div className="modal-backdrop"><form className="editor-modal service-editor" onSubmit={submit}><div className="modal-heading"><div><p className="eyebrow">{editor.item ? "EDITAR" : "NOVO CADASTRO"}</p><h2>Serviço</h2></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><Field label="Nome do serviço"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label="Descrição"><textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field><div className="form-columns"><Field label="Destinado a"><select value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })}><option value="DOG">Cachorro</option><option value="CAT">Gato</option><option value="BOTH">Ambos</option></select></Field><Field label="Tipo de cobrança"><select value={form.billingType} onChange={(e) => setForm({ ...form, billingType: e.target.value })}><option value="DAILY">Valor por diária</option><option value="HOURLY">Valor por hora/minuto</option><option value="FIXED">Valor fixo</option><option value="PER_WALK">Valor por passeio</option></select></Field></div><Field label="Duração"><div className="form-columns"><input type="number" min="1" placeholder="Quantidade" value={form.durationMinutes ?? ""} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} /><select value={form.durationUnit ?? "MINUTES"} onChange={(e) => setForm({ ...form, durationUnit: e.target.value })}><option value="MINUTES">Minutos</option><option value="HOURS">Horas</option><option value="DAILY">Diárias</option><option value="UNITS">Idas (unidade)</option></select></div></Field><Field label="Condições de preço"><div className="price-conditions">{form.priceConditions.map((condition, index) => <div className="price-condition" key={index}><input required placeholder="Ex.: Fim de semana, sexta-feira ou feriados" value={condition.name} onChange={(e) => updateCondition(index, "name", e.target.value)} /><input required min="0" step="0.01" type="number" placeholder="R$" value={condition.price} onChange={(e) => updateCondition(index, "price", e.target.value)} />{form.priceConditions.length > 1 && <button type="button" className="remove-condition" onClick={() => setForm({ ...form, priceConditions: form.priceConditions.filter((_, i) => i !== index) })}>×</button>}</div>)}<button type="button" className="add-condition" onClick={() => setForm({ ...form, priceConditions: [...form.priceConditions, { name: "", price: "" }] })}>+ Adicionar condição</button></div></Field><Field label="Quantidade máxima de pets (opcional)"><input type="number" min="1" value={form.maxPets ?? ""} onChange={(e) => setForm({ ...form, maxPets: e.target.value })} /></Field><div className="toggle-list"><Toggle label="Serviço ativo" checked={form.active} onChange={(active) => setForm({ ...form, active })} /><Toggle label="Permitir seleção de data" checked={form.allowDateSelection} onChange={(allowDateSelection) => setForm({ ...form, allowDateSelection })} /><Toggle label="Permitir observações do cliente" checked={form.allowCustomerNotes} onChange={(allowCustomerNotes) => setForm({ ...form, allowCustomerNotes })} /><Toggle label="Permitir horário de entrada e saída" checked={form.allowCheckInOut} onChange={(allowCheckInOut) => setForm({ ...form, allowCheckInOut })} /></div><button className="primary-button" disabled={loading}>{loading ? "Salvando..." : "Salvar serviço"}</button></form></div>;
 }
 function Toggle({ label, checked, onChange }) { return <label className="toggle-field"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>; }
@@ -806,6 +802,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
         });
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
+  const isDaycare = isDayCareService(selectedOffering) || String(form.serviceType ?? "").startsWith("DAYCARE");
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
   const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities);
   return (
@@ -885,7 +882,15 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
               return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
             {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
-            <Field label="Data de entrada">
+            {isDaycare ? <Field label="Data do serviço">
+              <input
+                required
+                type="date"
+                min={today()}
+                value={form.checkInDate}
+                onInput={(e) => setForm({ ...form, checkInDate: e.target.value, checkOutDate: e.target.value })}
+              />
+            </Field> : <><Field label="Data de entrada">
               <input
                 required
                 type="date"
@@ -896,7 +901,8 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 }
               />
             </Field>
-            {showCheckInOut && <><Field label="Horário de entrada">
+            </>}
+            {(showCheckInOut || isDaycare) && <><Field label="Horário de entrada">
               <input
                 required
                 type="time"
@@ -906,7 +912,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 }
               />
             </Field></>}
-            <Field label="Data de saída">
+            {!isDaycare && <Field label="Data de saída">
               <input
                 required
                 type="date"
@@ -917,7 +923,8 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 }
               />
             </Field>
-            {showCheckInOut && <Field label="Horário de saída">
+            }
+            {(showCheckInOut || isDaycare) && <Field label="Horário de saída">
               <input
                 required
                 type="time"
@@ -1042,6 +1049,13 @@ function labelOf(v) {
 }
 function serviceName(id) {
   return services.find(([key]) => key === id)?.[1] ?? id;
+}
+function isDayCareService(service) {
+  const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return service?.category === "DAYCARE" || name.includes("daycare") || name.includes("day care");
+}
+function isDayCareReservation(reservation) {
+  return String(reservation?.serviceType ?? "").startsWith("DAYCARE") || isDayCareService({ name: reservation?.serviceName });
 }
 function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00", extraQuantities = {}) {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;

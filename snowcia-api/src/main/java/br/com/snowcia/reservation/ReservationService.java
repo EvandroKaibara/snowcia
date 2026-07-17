@@ -54,9 +54,10 @@ public class ReservationService {
     }
 
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
-        validateDates(request);
         var pet = findOwnedPet(owner, request.petId());
         var offering = findOffering(pet, request.serviceOfferingId());
+        request = normalizeDaycareDates(offering, request);
+        validateDates(request);
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
@@ -77,9 +78,10 @@ public class ReservationService {
     }
 
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
-        validateDates(request);
         var reservation = findOwnedReservation(owner, id);
         var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
+        request = normalizeDaycareDates(offering, request);
+        validateDates(request);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser alteradas");
         }
@@ -189,6 +191,12 @@ public class ReservationService {
             total = total.add(priceForDate(offering, day));
         }
         return total;
+    }
+
+    private ReservationRequest normalizeDaycareDates(ServiceOffering offering, ReservationRequest request) {
+        var isDaycare = request.serviceType().name().startsWith("DAYCARE") || (offering != null && (offering.getCategory() == br.com.snowcia.offering.ServiceCategory.DAYCARE || Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase().contains("daycare") || Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase().contains("day care")));
+        if (!isDaycare) return request;
+        return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
     }
 
     private BigDecimal calculateExtrasPrice(ServiceOffering offering, ReservationRequest request) {
