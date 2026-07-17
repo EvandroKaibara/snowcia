@@ -37,22 +37,25 @@ public class ServiceOffering {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "service_price_conditions", joinColumns = @JoinColumn(name = "service_id"))
     private List<ServicePriceCondition> priceConditions = new ArrayList<>();
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "service_extras", joinColumns = @JoinColumn(name = "service_id"))
+    private List<ServiceExtra> extras = new ArrayList<>();
 
     protected ServiceOffering() { }
 
     public ServiceOffering(String name, String description, ServiceCategory category, ServiceTarget target, BillingType billingType,
             Integer durationMinutes, DurationUnit durationUnit, boolean active, boolean allowDateSelection, boolean allowTimeSelection,
-            boolean allowCustomerNotes, boolean allowCheckInOut, Integer maxPets, List<ServicePriceCondition> priceConditions) {
+            boolean allowCustomerNotes, boolean allowCheckInOut, Integer maxPets, List<ServicePriceCondition> priceConditions, List<ServiceExtra> extras) {
         update(name, description, category, target, billingType, durationMinutes, durationUnit, active, allowDateSelection, allowTimeSelection,
-                allowCustomerNotes, allowCheckInOut, maxPets, priceConditions);
+                allowCustomerNotes, allowCheckInOut, maxPets, priceConditions, extras);
     }
     public void update(String name, String description, ServiceCategory category, ServiceTarget target, BillingType billingType,
             Integer durationMinutes, DurationUnit durationUnit, boolean active, boolean allowDateSelection, boolean allowTimeSelection,
-            boolean allowCustomerNotes, boolean allowCheckInOut, Integer maxPets, List<ServicePriceCondition> priceConditions) {
+            boolean allowCustomerNotes, boolean allowCheckInOut, Integer maxPets, List<ServicePriceCondition> priceConditions, List<ServiceExtra> extras) {
         this.name = name; this.description = description; this.category = category; this.target = target; this.billingType = billingType;
         this.durationMinutes = durationMinutes; this.durationUnit = durationUnit == null ? DurationUnit.MINUTES : durationUnit; this.active = active; this.allowDateSelection = allowDateSelection;
         this.allowTimeSelection = allowTimeSelection; this.allowCustomerNotes = allowCustomerNotes; this.allowCheckInOut = allowCheckInOut;
-        this.maxPets = maxPets; this.priceConditions.clear(); this.priceConditions.addAll(priceConditions);
+        this.maxPets = maxPets; this.priceConditions.clear(); this.priceConditions.addAll(priceConditions); this.extras.clear(); this.extras.addAll(extras == null ? List.of() : extras);
     }
     public Long getId() { return id; } public String getName() { return name; } public String getDescription() { return description; }
     public ServiceCategory getCategory() { return category; } public ServiceTarget getTarget() { return target; }
@@ -62,4 +65,5 @@ public class ServiceOffering {
     public boolean isAllowTimeSelection() { return allowTimeSelection; } public boolean isAllowCustomerNotes() { return allowCustomerNotes; }
     public boolean isAllowCheckInOut() { return allowCheckInOut; } public Integer getMaxPets() { return maxPets; }
     public List<ServicePriceCondition> getPriceConditions() { return priceConditions; }
+    public List<ServiceExtra> getExtras() { return extras; }
 }

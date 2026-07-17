@@ -15,4 +15,4 @@ public record ServiceOfferingRequest(
         @NotBlank String name, String description, @NotNull ServiceCategory category, @NotNull ServiceTarget target,
         @NotNull BillingType billingType, @Min(1) Integer durationMinutes, DurationUnit durationUnit, boolean active,
         boolean allowDateSelection, boolean allowTimeSelection, boolean allowCustomerNotes, boolean allowCheckInOut,
-        @Min(1) Integer maxPets, @NotEmpty List<@Valid PriceConditionRequest> priceConditions) { }
+        @Min(1) Integer maxPets, @NotEmpty List<@Valid PriceConditionRequest> priceConditions, List<@Valid ServiceExtraRequest> extras) { }

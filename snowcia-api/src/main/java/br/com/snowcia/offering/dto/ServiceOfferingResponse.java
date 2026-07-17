@@ -10,11 +10,11 @@ import br.com.snowcia.offering.DurationUnit;
 public record ServiceOfferingResponse(Long id, String name, String description, ServiceCategory category, ServiceTarget target,
         BillingType billingType, Integer durationMinutes, DurationUnit durationUnit, boolean active, boolean allowDateSelection,
         boolean allowTimeSelection, boolean allowCustomerNotes, boolean allowCheckInOut, Integer maxPets,
-        List<PriceConditionResponse> priceConditions) {
+        List<PriceConditionResponse> priceConditions, List<ServiceExtraResponse> extras) {
     public static ServiceOfferingResponse from(ServiceOffering service) {
         return new ServiceOfferingResponse(service.getId(), service.getName(), service.getDescription(), service.getCategory(),
                 service.getTarget(), service.getBillingType(), service.getDurationMinutes(), service.getDurationUnit(), service.isActive(),
                 service.isAllowDateSelection(), service.isAllowTimeSelection(), service.isAllowCustomerNotes(),
-                service.isAllowCheckInOut(), service.getMaxPets(), service.getPriceConditions().stream().map(PriceConditionResponse::from).toList());
+                service.isAllowCheckInOut(), service.getMaxPets(), service.getPriceConditions().stream().map(PriceConditionResponse::from).toList(), service.getExtras().stream().map(ServiceExtraResponse::from).toList());
     }
 }
