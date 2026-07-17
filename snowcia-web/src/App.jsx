@@ -1001,6 +1001,7 @@ function ReservationRow({ reservation }) {
         {formatDate(reservation.checkOutDate)}{" "}
         {formatTime(reservation.checkOutTime)}
       </p>
+      {reservation.status === "AWAITING_PAYMENT" && <p className="payment-whatsapp-tip">O pagamento será realizado pelo WhatsApp. Aguarde o envio do link.</p>}
       {reservation.notes && <p className="muted">{reservation.notes}</p>}
       {reservation.declineReason && (
         <p className="decline-reason">Motivo: {reservation.declineReason}</p>

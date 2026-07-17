@@ -57,3 +57,4 @@
 .toast.success { background: #e4f7ec; color: #087443; }.toast.error { background: #fff0ed; color: #b42318; }
 .toast span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: currentColor; color: var(--white); font-size: 13px; font-weight: 900; }.toast p { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.35; }.toast button { margin-left: 3px; border: 0; background: transparent; color: currentColor; font-size: 20px; line-height: 1; cursor: pointer; }
 @keyframes toast-in { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.payment-whatsapp-tip { margin: 9px 0 0; color: #8a5a00; font-size: 12px; font-weight: 700; }
