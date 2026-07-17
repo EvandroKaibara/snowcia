@@ -9,7 +9,7 @@ const navigation = [
   ["Perfil", "☺"],
   ["Pagamentos", "◈"],
 ];
-const adminNavigation = [["Visão geral", "⌂"], ["Reservas", "▣"], ["Pagamentos", "◈"], ["Pets cadastrados", "♧"], ["Clientes", "☻"], ["Perfil", "☺"]];
+const adminNavigation = [["Visão geral", "⌂"], ["Reservas", "▣"], ["Pagamentos", "◈"], ["Serviços", "✦"], ["Pets cadastrados", "♧"], ["Clientes", "☻"], ["Perfil", "☺"]];
 const species = ["DOG", "CAT", "BIRD", "OTHER"];
 const initialData = {
   pets: [],
@@ -17,6 +17,7 @@ const initialData = {
   payments: [],
   profile: null,
   clients: [],
+  serviceOfferings: [],
 };
 const services = [
   ["HOSTING_24H", "Hospedagem (diária 24h)", "R$ 50 - R$ 75/dia"],
@@ -90,14 +91,15 @@ function App() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [pets, reservations, payments, profile, clients] = await Promise.all([
+      const [pets, reservations, payments, profile, clients, serviceOfferings] = await Promise.all([
         request("/api/pets"),
         request("/api/reservations"),
         isAdmin ? request("/api/payments") : Promise.resolve([]),
         request("/api/users/me"),
         isAdmin ? request("/api/users/clients") : Promise.resolve([]),
+        isAdmin ? request("/api/services") : Promise.resolve([]),
       ]);
-      setData({ pets, reservations, payments, profile, clients });
+      setData({ pets, reservations, payments, profile, clients, serviceOfferings });
     } catch (e) {
       setError(e.message);
     }
@@ -156,6 +158,11 @@ function App() {
             body: JSON.stringify({ ...form, petId: Number(form.petId) }),
           },
         );
+      if (type === "service")
+        await request(item ? `/api/services/${item.id}` : "/api/services", {
+          method: item ? "PUT" : "POST",
+          body: JSON.stringify(form),
+        });
       setEditor(null);
       await refresh();
     } catch (e) {
@@ -197,6 +204,13 @@ function App() {
     } catch (e) {
       setError(e.message);
     }
+  }
+  async function serviceAction(id, action) {
+    try {
+      if (action === "delete" && !window.confirm("Excluir este serviço?")) return;
+      await request(`/api/services/${id}${action === "toggle" ? "/toggle" : ""}`, { method: action === "toggle" ? "PUT" : "DELETE" });
+      refresh();
+    } catch (e) { setError(e.message); }
   }
   async function updateProfile(profile) {
     try { await request("/api/users/me", { method: "PUT", body: JSON.stringify(profile) }); await refresh(); }
@@ -286,10 +300,12 @@ function App() {
         {active === "Pagamentos" && isAdmin && (
           <Payments payments={data.payments} updatePayment={updatePayment} />
         )}
+        {active === "Serviços" && isAdmin && <ServiceOfferings services={data.serviceOfferings} openEditor={setEditor} onAction={serviceAction} />}
         {active === "Pets cadastrados" && isAdmin && <AdminPets pets={data.pets} />}
         {active === "Clientes" && isAdmin && <Clients clients={data.clients} reservations={data.reservations} payments={data.payments} pets={data.pets} />}
       </section>
-      {editor && (
+      {editor && editor.type === "service" && <ServiceEditor editor={editor} onClose={() => setEditor(null)} onSave={saveEditor} loading={loading} />}
+      {editor && editor.type !== "service" && (
         <Editor
           editor={editor}
           pets={data.pets}
@@ -750,6 +766,19 @@ function Payments({ payments, updatePayment }) {
     </section>
   );
 }
+function ServiceOfferings({ services, openEditor, onAction }) {
+  return <section className="list-card"><SectionHeading title="Serviços" onAction={() => openEditor({ type: "service" })} action="Adicionar serviço" /><div className="item-grid">{services.map((service) => <article className="pet-card admin-pet-card service-card" key={service.id}><div className="pet-emoji">✦</div><h3>{service.name}</h3><p>{service.category} · {service.target === "BOTH" ? "Cachorro e gato" : service.target === "DOG" ? "Cachorro" : "Gato"}</p><p className="card-meta">{service.priceConditions?.map((condition) => `${condition.name}: R$ ${Number(condition.price).toFixed(2)}`).join(" · ")}</p><div className="service-actions"><button className="card-more" onClick={() => openEditor({ type: "service", item: service })}>Editar</button><button className="small-action" onClick={() => onAction(service.id, "toggle")}>{service.active ? "Inativar" : "Ativar"}</button><button className="small-action danger" onClick={() => onAction(service.id, "delete")}>Excluir</button></div></article>)}</div>{!services.length && <Empty text="Nenhum serviço cadastrado. Use “Adicionar serviço” para criar o primeiro." />}</section>;
+}
+
+function ServiceEditor({ editor, onClose, onSave, loading }) {
+  const initial = editor.item ?? { name: "", description: "", category: "HOSTING", target: "DOG", billingType: "DAILY", durationMinutes: "", active: true, allowDateSelection: true, allowTimeSelection: false, allowCustomerNotes: true, allowCheckInOut: false, maxPets: "", priceConditions: [{ name: "Segunda a quinta", price: "" }] };
+  const [form, setForm] = useState(initial);
+  const updateCondition = (index, key, value) => setForm({ ...form, priceConditions: form.priceConditions.map((condition, i) => i === index ? { ...condition, [key]: value } : condition) });
+  const submit = (event) => { event.preventDefault(); onSave({ ...form, durationMinutes: form.durationMinutes ? Number(form.durationMinutes) : null, maxPets: form.maxPets ? Number(form.maxPets) : null, priceConditions: form.priceConditions.map((condition) => ({ ...condition, price: Number(condition.price) })) }); };
+  return <div className="modal-backdrop"><form className="editor-modal service-editor" onSubmit={submit}><div className="modal-heading"><div><p className="eyebrow">{editor.item ? "EDITAR" : "NOVO CADASTRO"}</p><h2>Serviço</h2></div><button type="button" className="icon-button" onClick={onClose}>×</button></div><Field label="Nome do serviço"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label="Descrição"><textarea value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field><div className="form-columns"><Field label="Categoria"><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="HOSTING">Hospedagem</option><option value="DAYCARE">Daycare</option><option value="WALK">Passeio</option><option value="CAT_SITTER">Cat Sitter</option><option value="OTHER">Outro</option></select></Field><Field label="Destinado a"><select value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })}><option value="DOG">Cachorro</option><option value="CAT">Gato</option><option value="BOTH">Ambos</option></select></Field></div><div className="form-columns"><Field label="Tipo de cobrança"><select value={form.billingType} onChange={(e) => setForm({ ...form, billingType: e.target.value })}><option value="DAILY">Valor por diária</option><option value="HOURLY">Valor por hora/minuto</option><option value="FIXED">Valor fixo</option><option value="PER_WALK">Valor por passeio</option></select></Field><Field label="Duração (minutos)"><input type="number" min="1" value={form.durationMinutes ?? ""} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} /></Field></div><Field label="Condições de preço"><div className="price-conditions">{form.priceConditions.map((condition, index) => <div className="price-condition" key={index}><input required placeholder="Ex.: Sexta-feira" value={condition.name} onChange={(e) => updateCondition(index, "name", e.target.value)} /><input required min="0" step="0.01" type="number" placeholder="R$" value={condition.price} onChange={(e) => updateCondition(index, "price", e.target.value)} />{form.priceConditions.length > 1 && <button type="button" className="remove-condition" onClick={() => setForm({ ...form, priceConditions: form.priceConditions.filter((_, i) => i !== index) })}>×</button>}</div>)}<button type="button" className="add-condition" onClick={() => setForm({ ...form, priceConditions: [...form.priceConditions, { name: "", price: "" }] })}>+ Adicionar condição</button></div></Field><Field label="Quantidade máxima de pets (opcional)"><input type="number" min="1" value={form.maxPets ?? ""} onChange={(e) => setForm({ ...form, maxPets: e.target.value })} /></Field><div className="toggle-list"><Toggle label="Serviço ativo" checked={form.active} onChange={(active) => setForm({ ...form, active })} /><Toggle label="Permitir seleção de data" checked={form.allowDateSelection} onChange={(allowDateSelection) => setForm({ ...form, allowDateSelection })} /><Toggle label="Permitir seleção de horário" checked={form.allowTimeSelection} onChange={(allowTimeSelection) => setForm({ ...form, allowTimeSelection })} /><Toggle label="Permitir observações do cliente" checked={form.allowCustomerNotes} onChange={(allowCustomerNotes) => setForm({ ...form, allowCustomerNotes })} /><Toggle label="Permitir horário de entrada e saída" checked={form.allowCheckInOut} onChange={(allowCheckInOut) => setForm({ ...form, allowCheckInOut })} /></div><button className="primary-button" disabled={loading}>{loading ? "Salvando..." : "Salvar serviço"}</button></form></div>;
+}
+function Toggle({ label, checked, onChange }) { return <label className="toggle-field"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>; }
+
 function Editor({ editor, pets, onClose, onSave, loading }) {
   const { type, item } = editor;
   const initial =
