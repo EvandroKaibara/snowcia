@@ -62,7 +62,7 @@ public class ReservationService {
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeSingleDayServiceDates(offering, request);
         validateDates(request);
-        validateServiceForPet(pet, request.serviceType());
+        if (offering == null) validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
         var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, assignedAdmin, request.checkInDate(),
@@ -94,7 +94,7 @@ public class ReservationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O pet da reserva não pode ser alterado");
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
-        validateServiceForPet(reservation.getPet(), request.serviceType());
+        if (offering == null) validateServiceForPet(reservation.getPet(), request.serviceType());
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateService(request.serviceType(), offering);
