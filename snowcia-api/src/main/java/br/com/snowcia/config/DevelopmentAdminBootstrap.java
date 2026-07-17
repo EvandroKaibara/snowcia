@@ -21,15 +21,15 @@ public class DevelopmentAdminBootstrap {
             @Value("${app.bootstrap-admin.email}") String email,
             @Value("${app.bootstrap-admin.password}") String password) {
         return args -> {
-            if (email.isBlank() || password.isBlank()) {
-                return;
-            }
-            if (userRepository.findByEmail(email).isPresent()) {
-                return;
-            }
             var adminRole = roleRepository.findByName("ADMIN")
                     .orElseThrow(() -> new IllegalStateException("Perfil ADMIN não encontrado"));
-        userRepository.save(new AppUser(name, email, null, passwordEncoder.encode(password), adminRole));
+            if (!email.isBlank() && !password.isBlank() && userRepository.findByEmail(email).isEmpty()) userRepository.save(new AppUser(name, email, null, passwordEncoder.encode(password), adminRole));
+            createAdminIfMissing(userRepository, passwordEncoder, adminRole, "Jussara", "jussara@snowcia.local");
+            createAdminIfMissing(userRepository, passwordEncoder, adminRole, "Isabella", "isabella@snowcia.local");
         };
+    }
+
+    private void createAdminIfMissing(UserRepository users, PasswordEncoder encoder, br.com.snowcia.role.Role role, String name, String email) {
+        if (users.findByEmail(email).isEmpty()) users.save(new AppUser(name, email, null, encoder.encode("Snowcia@123"), role));
     }
 }

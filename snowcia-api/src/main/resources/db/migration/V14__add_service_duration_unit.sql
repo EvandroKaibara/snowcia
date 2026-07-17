@@ -1,0 +1,1 @@
+ALTER TABLE service_offerings ADD COLUMN duration_unit VARCHAR(20) NOT NULL DEFAULT 'MINUTES';

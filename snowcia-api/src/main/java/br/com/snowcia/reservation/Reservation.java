@@ -2,9 +2,12 @@ package br.com.snowcia.reservation;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.math.BigDecimal;
 
 import br.com.snowcia.pet.Pet;
+import br.com.snowcia.offering.ServiceOffering;
+import br.com.snowcia.user.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,6 +40,12 @@ public class Reservation {
     @Column(name = "check_out_date", nullable = false)
     private LocalDate checkOutDate;
 
+    @Column(name = "check_in_time")
+    private LocalTime checkInTime;
+
+    @Column(name = "check_out_time")
+    private LocalTime checkOutTime;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private ReservationStatus status;
@@ -45,11 +54,22 @@ public class Reservation {
     @Column(name = "service_type", nullable = false, length = 30)
     private ReservationServiceType serviceType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_offering_id")
+    private ServiceOffering serviceOffering;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_admin_id")
+    private AppUser assignedAdmin;
+
     @Column(length = 500)
     private String notes;
 
     @Column(name = "decline_reason", length = 500)
     private String declineReason;
+
+    @Column(name = "internal_notes", length = 1000)
+    private String internalNotes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -63,18 +83,22 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, ReservationServiceType serviceType, LocalDate checkInDate, LocalDate checkOutDate,
-            String notes, BigDecimal totalAmount) {
+    public Reservation(Pet pet, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
+            LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
+        this.serviceOffering = serviceOffering;
+        this.assignedAdmin = assignedAdmin;
         this.totalAmount = totalAmount;
-        update(checkInDate, checkOutDate, notes);
+        update(checkInDate, checkOutDate, checkInTime, checkOutTime, notes);
     }
 
-    public void update(LocalDate checkInDate, LocalDate checkOutDate, String notes) {
+    public void update(LocalDate checkInDate, LocalDate checkOutDate, LocalTime checkInTime, LocalTime checkOutTime, String notes) {
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
+        this.checkInTime = checkInTime;
+        this.checkOutTime = checkOutTime;
         this.notes = notes;
     }
 
@@ -95,6 +119,12 @@ public class Reservation {
         status = ReservationStatus.DECLINED;
         declineReason = reason;
     }
+    public void cancel() { status = ReservationStatus.CANCELLED; }
+    public void updateService(ReservationServiceType serviceType, ServiceOffering serviceOffering) { this.serviceType = serviceType; this.serviceOffering = serviceOffering; }
+    public void assignAdmin(AppUser admin) { this.assignedAdmin = admin; }
+
+    public void complete() { status = ReservationStatus.COMPLETED; }
+    public void updateInternalNotes(String notes) { internalNotes = notes; }
 
     @PrePersist
     void onCreate() {
@@ -111,9 +141,14 @@ public class Reservation {
     public Pet getPet() { return pet; }
     public LocalDate getCheckInDate() { return checkInDate; }
     public LocalDate getCheckOutDate() { return checkOutDate; }
+    public LocalTime getCheckInTime() { return checkInTime; }
+    public LocalTime getCheckOutTime() { return checkOutTime; }
     public ReservationStatus getStatus() { return status; }
     public ReservationServiceType getServiceType() { return serviceType; }
+    public ServiceOffering getServiceOffering() { return serviceOffering; }
+    public AppUser getAssignedAdmin() { return assignedAdmin; }
     public String getNotes() { return notes; }
     public String getDeclineReason() { return declineReason; }
+    public String getInternalNotes() { return internalNotes; }
     public BigDecimal getTotalAmount() { return totalAmount; }
 }

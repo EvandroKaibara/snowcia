@@ -9,5 +9,7 @@ public interface PetRepository extends JpaRepository<Pet, Long> {
 
     List<Pet> findAllByOwnerIdOrderByNameAsc(Long ownerId);
 
+    List<Pet> findAllByOrderByNameAsc();
+
     Optional<Pet> findByIdAndOwnerId(Long id, Long ownerId);
 }

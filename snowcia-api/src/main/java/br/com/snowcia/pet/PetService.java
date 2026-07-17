@@ -19,12 +19,13 @@ public class PetService {
     }
 
     public PetResponse create(AppUser owner, PetRequest request) {
-        var pet = new Pet(owner, request.name().trim(), request.species(), normalize(request.breed()), request.birthDate());
+        var pet = new Pet(owner, request.name().trim(), request.species(), normalize(request.breed()), request.birthDate(), normalize(request.gender()), request.neutered(), request.vaccinationsCurrent(), request.fleaPreventionCurrent(), normalize(request.healthConditions()), normalize(request.specialCare()), normalize(request.allergies()), normalize(request.humanSocial()), normalize(request.petSocial()), normalize(request.importantHabits()), normalize(request.observations()));
         return PetResponse.from(petRepository.save(pet));
     }
 
     public List<PetResponse> list(AppUser owner) {
-        return petRepository.findAllByOwnerIdOrderByNameAsc(owner.getId()).stream().map(PetResponse::from).toList();
+        var pets = owner.isAdmin() ? petRepository.findAllByOrderByNameAsc() : petRepository.findAllByOwnerIdOrderByNameAsc(owner.getId());
+        return pets.stream().map(PetResponse::from).toList();
     }
 
     public PetResponse get(AppUser owner, Long id) {
@@ -33,7 +34,7 @@ public class PetService {
 
     public PetResponse update(AppUser owner, Long id, PetRequest request) {
         var pet = findOwnedPet(owner, id);
-        pet.update(request.name().trim(), request.species(), normalize(request.breed()), request.birthDate());
+        pet.update(request.name().trim(), request.species(), normalize(request.breed()), request.birthDate(), normalize(request.gender()), request.neutered(), request.vaccinationsCurrent(), request.fleaPreventionCurrent(), normalize(request.healthConditions()), normalize(request.specialCare()), normalize(request.allergies()), normalize(request.humanSocial()), normalize(request.petSocial()), normalize(request.importantHabits()), normalize(request.observations()));
         return PetResponse.from(petRepository.save(pet));
     }
 

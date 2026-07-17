@@ -5,6 +5,7 @@ import java.util.List;
 import br.com.snowcia.reservation.dto.ReservationRequest;
 import br.com.snowcia.reservation.dto.DeclineReservationRequest;
 import br.com.snowcia.reservation.dto.ReservationResponse;
+import br.com.snowcia.reservation.dto.InternalNotesRequest;
 import br.com.snowcia.user.AppUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,8 @@ public class ReservationController {
             @Valid @RequestBody DeclineReservationRequest request) {
         return reservationService.decline(user, id, request);
     }
+    @PatchMapping("/{id}/complete") public ReservationResponse complete(@AuthenticationPrincipal AppUser user, @PathVariable Long id) { return reservationService.complete(user, id); }
+    @PatchMapping("/{id}/internal-notes") public ReservationResponse internalNotes(@AuthenticationPrincipal AppUser user, @PathVariable Long id, @Valid @RequestBody InternalNotesRequest request) { return reservationService.updateInternalNotes(user, id, request.notes()); }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
