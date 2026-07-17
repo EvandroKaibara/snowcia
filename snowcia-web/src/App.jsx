@@ -680,7 +680,7 @@ function ReservationDetail({
   onApprove,
   onDecline,
 }) {
-  const isDaycare = isDayCareReservation(reservation);
+  const isSingleDayService = isSingleDayReservation(reservation);
   return (
     <div className="reservation-row detailed">
       <div className="pet-dot">🐾</div>
@@ -688,7 +688,7 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>{isDaycare ? <>{formatDate(reservation.checkInDate)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</> : <>{formatDate(reservation.checkInDate)} {formatTime(reservation.checkInTime)} — {formatDate(reservation.checkOutDate)} {formatTime(reservation.checkOutTime)}</>} · {formatCurrency(reservation.totalAmount)}</small>
+        <small>{isSingleDayService ? <>{formatDate(reservation.checkInDate)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</> : <>{formatDate(reservation.checkInDate)} {formatTime(reservation.checkInTime)} — {formatDate(reservation.checkOutDate)} {formatTime(reservation.checkOutTime)}</>} · {formatCurrency(reservation.totalAmount)}</small>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -808,6 +808,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const isDaycare = isDayCareService(selectedOffering) || String(form.serviceType ?? "").startsWith("DAYCARE");
+  const isSingleDayService = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
   const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities);
   return (
@@ -894,7 +895,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
               {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
             </Field>
             {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
-            {isDaycare ? <Field label="Data do serviço">
+            {isSingleDayService ? <Field label="Data do serviço">
               <input
                 required
                 type="date"
@@ -924,7 +925,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
                 }
               />
             </Field></>}
-            {!isDaycare && <Field label="Data de saída">
+            {!isSingleDayService && <Field label="Data de saída">
               <input
                 required
                 type="date"
@@ -1072,6 +1073,13 @@ function isHalfDayCareService(service) {
 }
 function isDayCareReservation(reservation) {
   return String(reservation?.serviceType ?? "").startsWith("DAYCARE") || isDayCareService({ name: reservation?.serviceName });
+}
+function isWalkService(service) {
+  const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return service?.category === "WALK" || name.includes("passeio") || name.includes("walk");
+}
+function isSingleDayReservation(reservation) {
+  return isDayCareReservation(reservation) || String(reservation?.serviceType ?? "").startsWith("WALK") || isWalkService({ name: reservation?.serviceName });
 }
 function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00", extraQuantities = {}) {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;

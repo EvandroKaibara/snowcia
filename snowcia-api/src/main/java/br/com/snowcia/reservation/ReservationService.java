@@ -60,7 +60,7 @@ public class ReservationService {
         var pet = findOwnedPet(owner, request.petId());
         var offering = findOffering(pet, request.serviceOfferingId());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
-        request = normalizeDaycareDates(offering, request);
+        request = normalizeSingleDayServiceDates(offering, request);
         validateDates(request);
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
@@ -85,7 +85,7 @@ public class ReservationService {
         var reservation = findOwnedReservation(owner, id);
         var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
-        request = normalizeDaycareDates(offering, request);
+        request = normalizeSingleDayServiceDates(offering, request);
         validateDates(request);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser alteradas");
@@ -200,8 +200,8 @@ public class ReservationService {
         return total;
     }
 
-    private ReservationRequest normalizeDaycareDates(ServiceOffering offering, ReservationRequest request) {
-        if (!request.serviceType().name().startsWith("DAYCARE") && !isDaycare(offering)) return request;
+    private ReservationRequest normalizeSingleDayServiceDates(ServiceOffering offering, ReservationRequest request) {
+        if (!request.serviceType().name().startsWith("DAYCARE") && !request.serviceType().name().startsWith("WALK") && !isDaycare(offering) && !isWalk(offering)) return request;
         return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
     }
 
@@ -209,6 +209,12 @@ public class ReservationService {
         if (offering == null) return false;
         var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
         return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.DAYCARE || name.contains("daycare") || name.contains("day care");
+    }
+
+    private boolean isWalk(ServiceOffering offering) {
+        if (offering == null) return false;
+        var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.WALK || name.contains("passeio") || name.contains("walk");
     }
 
     private BigDecimal daycareOvertime(ServiceOffering offering, LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
