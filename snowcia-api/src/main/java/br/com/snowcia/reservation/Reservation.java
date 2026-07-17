@@ -113,6 +113,7 @@ public class Reservation {
         status = ReservationStatus.DECLINED;
         declineReason = reason;
     }
+    public void cancel() { status = ReservationStatus.CANCELLED; }
     public void updateService(ReservationServiceType serviceType, ServiceOffering serviceOffering) { this.serviceType = serviceType; this.serviceOffering = serviceOffering; }
 
     public void complete() { status = ReservationStatus.COMPLETED; }

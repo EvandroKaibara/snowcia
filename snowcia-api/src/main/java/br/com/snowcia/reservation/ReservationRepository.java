@@ -13,6 +13,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     List<Reservation> findAllByOrderByCheckInDateAsc();
 
+    List<Reservation> findAllByStatusAndCheckOutDateBefore(ReservationStatus status, LocalDate date);
+
     Optional<Reservation> findByIdAndPetOwnerId(Long id, Long ownerId);
 
     boolean existsByPetIdAndIdNotAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(

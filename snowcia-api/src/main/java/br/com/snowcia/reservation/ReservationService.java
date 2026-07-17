@@ -65,6 +65,7 @@ public class ReservationService {
     }
 
     public List<ReservationResponse> list(AppUser user) {
+        finalizePastReservations();
         var reservations = user.isAdmin() ? reservationRepository.findAllByOrderByCheckInDateAsc()
                 : reservationRepository.findAllByPetOwnerIdOrderByCheckInDateAsc(user.getId());
         return reservations.stream().map(ReservationResponse::from).toList();
@@ -127,10 +128,12 @@ public class ReservationService {
 
     public void delete(AppUser owner, Long id) {
         var reservation = findOwnedReservation(owner, id);
-        if (reservation.getStatus() != ReservationStatus.PENDING) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser canceladas");
+        if (!List.of(ReservationStatus.PENDING, ReservationStatus.AWAITING_PAYMENT, ReservationStatus.CONFIRMED).contains(reservation.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta reserva não pode mais ser cancelada");
         }
-        reservationRepository.delete(reservation);
+        reservation.cancel();
+        reservationRepository.save(reservation);
+        paymentRepository.findByReservationId(reservation.getId()).ifPresent(payment -> { if (payment.getStatus() != PaymentStatus.PAID) { payment.cancel(); paymentRepository.save(payment); } });
     }
 
     private void validateDates(ReservationRequest request) {
@@ -144,6 +147,12 @@ public class ReservationService {
 
     public ReservationResponse complete(AppUser admin, Long id) { ensureAdmin(admin); var reservation = findReservation(id); if (reservation.getStatus() != ReservationStatus.CONFIRMED) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas confirmadas podem ser finalizadas"); reservation.complete(); return ReservationResponse.from(reservationRepository.save(reservation)); }
     public ReservationResponse updateInternalNotes(AppUser admin, Long id, String notes) { ensureAdmin(admin); var reservation = findReservation(id); reservation.updateInternalNotes(normalize(notes)); return ReservationResponse.from(reservationRepository.save(reservation)); }
+
+    private void finalizePastReservations() {
+        var finished = reservationRepository.findAllByStatusAndCheckOutDateBefore(ReservationStatus.CONFIRMED, java.time.LocalDate.now());
+        finished.forEach(Reservation::complete);
+        if (!finished.isEmpty()) reservationRepository.saveAll(finished);
+    }
 
     private void validateServiceForPet(Pet pet, ReservationServiceType serviceType) {
         boolean catSitter = serviceType.name().startsWith("CAT_SITTER");

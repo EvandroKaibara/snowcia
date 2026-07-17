@@ -34,6 +34,8 @@ public class PaymentService {
         var payment = findPayment(id);
         if (payment.getStatus() == PaymentStatus.PAID) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Um pagamento confirmado não pode ser cancelado");
         payment.cancel();
+        payment.getReservation().cancel();
+        reservationRepository.save(payment.getReservation());
         return PaymentResponse.from(paymentRepository.save(payment));
     }
     public PaymentResponse markAsPending(Long id) { var payment = findPayment(id); payment.markAsPending(); return PaymentResponse.from(paymentRepository.save(payment)); }

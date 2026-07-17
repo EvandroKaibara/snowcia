@@ -461,9 +461,7 @@ function Dashboard({ data, upcoming, paid, isAdmin, onReserve }) {
       </div>
       {isAdmin ? (
         <ReservationCalendar
-          reservations={data.reservations.filter((r) =>
-            ["AWAITING_PAYMENT", "CONFIRMED"].includes(r.status),
-          )}
+          reservations={data.reservations.filter((r) => r.status === "CONFIRMED")}
         />
       ) : (
         <section className="list-card">
@@ -720,7 +718,7 @@ function ReservationDetail({
             </button>
           </>
         )}
-        {!isAdmin && reservation.status === "PENDING" && (
+        {!isAdmin && ["PENDING", "AWAITING_PAYMENT"].includes(reservation.status) && (
           <>
             <button onClick={onEdit}>Editar</button>
             <button className="danger" onClick={onDelete}>
@@ -1118,6 +1116,6 @@ function calendarDays(c) {
 }
 function between(day, from, to) {
   const value = day.toISOString().slice(0, 10);
-  return value >= from && value < to;
+  return value >= from && value <= to;
 }
 export default App;
