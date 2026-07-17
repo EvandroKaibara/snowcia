@@ -1023,7 +1023,6 @@ function calculateOfferingAmount(service, checkInDate, checkOutDate) {
   if (!conditions.length) return null;
   const priceFor = (date) => Number((conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
   const firstDay = new Date(`${checkInDate}T12:00:00`);
-  if (service.billingType === "FIXED" || service.billingType === "PER_WALK") return priceFor(firstDay);
   let total = 0;
   const lastChargeableDay = checkOutDate === checkInDate ? new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);
   for (let day = firstDay; day < lastChargeableDay; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) total += priceFor(day);

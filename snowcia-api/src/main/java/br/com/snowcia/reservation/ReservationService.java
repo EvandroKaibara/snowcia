@@ -164,10 +164,6 @@ public class ReservationService {
     }
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut) {
-        if (offering.getBillingType() == br.com.snowcia.offering.BillingType.FIXED
-                || offering.getBillingType() == br.com.snowcia.offering.BillingType.PER_WALK) {
-            return priceForDate(offering, checkIn);
-        }
         var total = BigDecimal.ZERO;
         var lastChargeableDay = checkOut.equals(checkIn) ? checkOut.plusDays(1) : checkOut;
         for (var day = checkIn; day.isBefore(lastChargeableDay); day = day.plusDays(1)) {
