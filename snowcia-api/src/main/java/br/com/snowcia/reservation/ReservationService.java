@@ -178,6 +178,7 @@ public class ReservationService {
     }
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime) {
+        if (isDaycare(offering)) return priceForDate(offering, checkIn).add(daycareOvertime(checkIn, checkInTime, checkOut, checkOutTime));
         if (offering.getBillingType() == br.com.snowcia.offering.BillingType.DAILY) {
             var minutes = Duration.between(LocalDateTime.of(checkIn, checkInTime), LocalDateTime.of(checkOut, checkOutTime)).toMinutes();
             var dailyCount = Math.max(1, (minutes + 1439) / 1440);
@@ -194,9 +195,20 @@ public class ReservationService {
     }
 
     private ReservationRequest normalizeDaycareDates(ServiceOffering offering, ReservationRequest request) {
-        var isDaycare = request.serviceType().name().startsWith("DAYCARE") || (offering != null && (offering.getCategory() == br.com.snowcia.offering.ServiceCategory.DAYCARE || Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase().contains("daycare") || Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase().contains("day care")));
-        if (!isDaycare) return request;
+        if (!request.serviceType().name().startsWith("DAYCARE") && !isDaycare(offering)) return request;
         return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
+    }
+
+    private boolean isDaycare(ServiceOffering offering) {
+        if (offering == null) return false;
+        var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.DAYCARE || name.contains("daycare") || name.contains("day care");
+    }
+
+    private BigDecimal daycareOvertime(LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
+        var minutes = Duration.between(LocalDateTime.of(checkIn, checkInTime), LocalDateTime.of(checkOut, checkOutTime)).toMinutes();
+        var overtimeHours = Math.max(0, (minutes - 720 + 59) / 60);
+        return BigDecimal.valueOf(overtimeHours).multiply(BigDecimal.valueOf(5));
     }
 
     private BigDecimal calculateExtrasPrice(ServiceOffering offering, ReservationRequest request) {

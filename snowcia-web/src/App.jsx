@@ -940,7 +940,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </Field>
-            {estimatedAmount != null && <div className="price-preview"><span>Valor estimado da reserva</span><strong>{formatCurrency(estimatedAmount)}</strong><small>O valor considera as condições de preço cadastradas para cada dia.</small></div>}
+            {estimatedAmount != null && <div className="price-preview"><span>Valor estimado da reserva</span><strong>{formatCurrency(estimatedAmount)}</strong><small>{isDaycare ? "O Day Care inclui até 12 horas; cada hora ou fração excedente soma R$ 5,00." : "O valor considera as condições de preço cadastradas para cada dia."}</small></div>}
           </>
         )}
         <button className="primary-button" disabled={loading}>
@@ -1065,7 +1065,12 @@ function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime
   const firstDay = new Date(`${checkInDate}T12:00:00`);
   let total = 0;
   let chargeableDays = 1;
-  if (service.billingType === "DAILY") {
+  if (isDayCareService(service)) {
+    const start = new Date(`${checkInDate}T${checkInTime}:00`);
+    const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
+    const overtimeHours = Math.max(0, Math.ceil(((end - start) / 60000 - 720) / 60));
+    total = priceFor(firstDay) + overtimeHours * 5;
+  } else if (service.billingType === "DAILY") {
     const start = new Date(`${checkInDate}T${checkInTime}:00`);
     const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
     chargeableDays = Math.max(1, Math.ceil((end - start) / 86400000));
