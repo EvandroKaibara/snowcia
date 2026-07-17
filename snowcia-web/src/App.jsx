@@ -10,7 +10,9 @@ const navigation = [
   ["Pagamentos", "◈"],
 ];
 const adminNavigation = [["Visão geral", "⌂"], ["Reservas", "▣"], ["Pagamentos", "◈"], ["Serviços", "✦"], ["Pets cadastrados", "♧"], ["Clientes", "☻"], ["Perfil", "☺"]];
-const species = ["DOG", "CAT", "BIRD", "OTHER"];
+const species = ["DOG", "CAT", "OTHER"];
+const dogBreeds = ["SRD (Sem Raça Definida)", "Affenpinscher", "Airedale Terrier", "Akita", "American Bully", "American Staffordshire Terrier", "Basenji", "Basset Hound", "Beagle", "Bearded Collie", "Bedlington Terrier", "Bichon Frisé", "Boiadeiro Australiano", "Border Collie", "Border Terrier", "Borboleta (Papillon)", "Boston Terrier", "Boxer", "Buldogue Campeiro", "Buldogue Francês", "Buldogue Inglês", "Bull Terrier", "Cane Corso", "Cavalier King Charles Spaniel", "Chihuahua", "Chow Chow", "Cocker Spaniel Americano", "Cocker Spaniel Inglês", "Collie", "Corgi Pembroke", "Dachshund (Teckel)", "Dálmata", "Dobermann", "Dogo Argentino", "Dogue Alemão", "Dogue de Bordeaux", "Fila Brasileiro", "Fox Paulistinha", "Fox Terrier", "Golden Retriever", "Greyhound", "Husky Siberiano", "Jack Russell Terrier", "Labrador Retriever", "Lhasa Apso", "Lulu da Pomerânia", "Maltês", "Mastiff Inglês", "Mastim Napolitano", "Munchkin", "Pastor Alemão", "Pastor Australiano", "Pastor Belga", "Pastor de Shetland", "Pequinês", "Pinscher", "Pit Bull Terrier", "Pointer", "Poodle", "Pug", "Rottweiler", "Samoieda", "São Bernardo", "Schnauzer", "Setter Irlandês", "Shar Pei", "Shiba Inu", "Shih Tzu", "Spitz Alemão", "Staffordshire Bull Terrier", "Terra-nova", "Whippet", "Yorkshire Terrier"];
+const catBreeds = ["SRD (Sem Raça Definida)", "Abissínio", "Angorá Turco", "American Curl", "Balinês", "Bengal", "Birmanês", "Bombaim", "British Shorthair", "Burmês", "Chartreux", "Cornish Rex", "Devon Rex", "Egípcio Mau", "Exótico", "Himalaio", "Maine Coon", "Manx", "Munchkin", "Nebelung", "Norueguês da Floresta", "Ocicat", "Oriental", "Persa", "Ragdoll", "Russian Blue", "Sagrado da Birmânia", "Scottish Fold", "Siamês", "Siberiano", "Singapura", "Somali", "Sphynx", "Tonquinês"];
 const initialData = {
   pets: [],
   reservations: [],
@@ -767,7 +769,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
   const initial =
     item ??
     (type === "pet"
-      ? { name: "", species: "DOG", breed: "", birthDate: "" }
+      ? { name: "", species: "DOG", breed: "SRD (Sem Raça Definida)", birthDate: "" }
       : {
           petId: pets[0]?.id ?? "",
           serviceType: "HOSTING_24H",
@@ -812,7 +814,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
             <Field label="Espécie">
               <select
                 value={form.species}
-                onChange={(e) => setForm({ ...form, species: e.target.value })}
+                onChange={(e) => setForm({ ...form, species: e.target.value, breed: e.target.value === "DOG" || e.target.value === "CAT" ? "SRD (Sem Raça Definida)" : "" })}
               >
                 {species.map((v) => (
                   <option key={v} value={v}>
@@ -821,12 +823,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 ))}
               </select>
             </Field>
-            <Field label="Raça">
-              <input
-                value={form.breed ?? ""}
-                onChange={(e) => setForm({ ...form, breed: e.target.value })}
-              />
-            </Field>
+            <Field label="Raça">{form.species === "DOG" || form.species === "CAT" ? <select value={form.breed || "SRD (Sem Raça Definida)"} onChange={(e) => setForm({ ...form, breed: e.target.value })}>{(form.species === "DOG" ? dogBreeds : catBreeds).map((breed) => <option key={breed} value={breed}>{breed}</option>)}</select> : <input value={form.breed ?? ""} onChange={(e) => setForm({ ...form, breed: e.target.value })} />}</Field>
             <Field label="Data de nascimento"><input type="date" value={form.birthDate ?? ""} onChange={(e) => setForm({ ...form, birthDate: e.target.value || null })} /></Field>
             <Field label="Gênero"><select value={form.gender ?? ""} onChange={(e) => setForm({ ...form, gender: e.target.value })}><option value="">Não informado</option><option value="MACHO">Macho</option><option value="FÊMEA">Fêmea</option></select></Field>
             <Field label="Castrado?"><select value={String(form.neutered ?? "")} onChange={(e) => setForm({ ...form, neutered: e.target.value === "" ? null : e.target.value === "true" })}><option value="">Não informado</option><option value="true">Sim</option><option value="false">Não</option></select></Field>
