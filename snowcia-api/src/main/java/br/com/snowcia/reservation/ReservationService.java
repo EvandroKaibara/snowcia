@@ -188,11 +188,19 @@ public class ReservationService {
     }
 
     private BigDecimal priceForDate(ServiceOffering offering, LocalDate date) {
-        return offering.getPriceConditions().stream()
+        var holidayCondition = offering.getPriceConditions().stream()
+                .filter(condition -> isHolidayCondition(condition.getName()) && isBrazilianNationalHoliday(date))
+                .findFirst();
+        return holidayCondition.or(() -> offering.getPriceConditions().stream()
                 .filter(condition -> appliesTo(condition.getName(), date))
-                .findFirst()
+                .findFirst())
                 .orElse(offering.getPriceConditions().getFirst())
                 .getPrice();
+    }
+
+    private boolean isHolidayCondition(String conditionName) {
+        var condition = Normalizer.normalize(conditionName, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return condition.contains("feriado") || condition.contains("holiday");
     }
 
     private boolean appliesTo(String conditionName, LocalDate date) {

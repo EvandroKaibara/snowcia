@@ -1021,7 +1021,7 @@ function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;
   const conditions = service.priceConditions ?? [];
   if (!conditions.length) return null;
-  const priceFor = (date) => Number((conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
+  const priceFor = (date) => Number((conditions.find((condition) => isHolidayCondition(condition.name) && isBrazilianNationalHoliday(date)) ?? conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
   const firstDay = new Date(`${checkInDate}T12:00:00`);
   if (service.billingType === "DAILY") {
     const start = new Date(`${checkInDate}T${checkInTime}:00`);
@@ -1050,6 +1050,7 @@ function conditionMatchesDay(name = "", date) {
     || ((condition.includes("sabado") || condition.includes("saturday")) && day === 6)
     || ((condition.includes("domingo") || condition.includes("sunday")) && day === 0);
 }
+function isHolidayCondition(name = "") { const condition = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); return condition.includes("feriado") || condition.includes("holiday"); }
 function isBrazilianNationalHoliday(date) {
   const month = date.getMonth() + 1, day = date.getDate();
   const fixed = (month === 1 && day === 1) || (month === 4 && day === 21) || (month === 5 && day === 1) || (month === 9 && day === 7) || (month === 10 && day === 12) || (month === 11 && [2, 15, 20].includes(day)) || (month === 12 && day === 25);
