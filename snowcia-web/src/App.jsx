@@ -1024,7 +1024,8 @@ function calculateOfferingAmount(service, checkInDate, checkOutDate) {
   const priceFor = (date) => Number((conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
   const firstDay = new Date(`${checkInDate}T12:00:00`);
   let total = 0;
-  const lastChargeableDay = checkOutDate === checkInDate ? new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);
+  const isCatSitter = service.category === "CAT_SITTER" || service.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("cat sitter");
+  const lastChargeableDay = (checkOutDate === checkInDate || isCatSitter) ? new Date(new Date(`${checkOutDate}T12:00:00`).getFullYear(), new Date(`${checkOutDate}T12:00:00`).getMonth(), new Date(`${checkOutDate}T12:00:00`).getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);
   for (let day = firstDay; day < lastChargeableDay; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) total += priceFor(day);
   return total;
 }

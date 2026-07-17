@@ -165,11 +165,17 @@ public class ReservationService {
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut) {
         var total = BigDecimal.ZERO;
-        var lastChargeableDay = checkOut.equals(checkIn) ? checkOut.plusDays(1) : checkOut;
+        var lastChargeableDay = (checkOut.equals(checkIn) || isCatSitter(offering)) ? checkOut.plusDays(1) : checkOut;
         for (var day = checkIn; day.isBefore(lastChargeableDay); day = day.plusDays(1)) {
             total = total.add(priceForDate(offering, day));
         }
         return total;
+    }
+
+    private boolean isCatSitter(ServiceOffering offering) {
+        return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.CAT_SITTER
+                || Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+                .toLowerCase().contains("cat sitter");
     }
 
     private BigDecimal priceForDate(ServiceOffering offering, LocalDate date) {
