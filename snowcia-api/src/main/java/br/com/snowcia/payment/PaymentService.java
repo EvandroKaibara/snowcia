@@ -18,7 +18,17 @@ public class PaymentService {
         this.reservationRepository = reservationRepository;
     }
 
-    public List<PaymentResponse> list() { return paymentRepository.findAllByOrderByCreatedAtDesc().stream().map(PaymentResponse::from).toList(); }
+    public List<PaymentResponse> list() {
+        var payments = paymentRepository.findAllByOrderByCreatedAtDesc();
+        var reservationsToCancel = payments.stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.CANCELLED)
+                .map(Payment::getReservation)
+                .filter(reservation -> reservation.getStatus() == br.com.snowcia.reservation.ReservationStatus.AWAITING_PAYMENT)
+                .toList();
+        reservationsToCancel.forEach(reservation -> reservation.cancel());
+        if (!reservationsToCancel.isEmpty()) reservationRepository.saveAll(reservationsToCancel);
+        return payments.stream().map(PaymentResponse::from).toList();
+    }
     public PaymentResponse get(Long id) { return PaymentResponse.from(findPayment(id)); }
 
     public PaymentResponse markAsPaid(Long id) {
