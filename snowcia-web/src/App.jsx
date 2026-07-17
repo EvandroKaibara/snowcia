@@ -54,11 +54,16 @@ function App() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState("Visão geral");
   const [data, setData] = useState(initialData);
   const [editor, setEditor] = useState(null);
   const isAdmin = role === "ADMIN";
+  const showToast = useCallback((message, type = "success") => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const request = useCallback(
     async (path, options = {}) => {
@@ -167,8 +172,10 @@ function App() {
         });
       setEditor(null);
       await refresh();
+      showToast("Alterações salvas com sucesso.");
     } catch (e) {
       setError(e.message);
+      showToast(e.message, "error");
     } finally {
       setLoading(false);
     }
@@ -178,8 +185,10 @@ function App() {
     try {
       await request(`/api/${type}/${id}`, { method: "DELETE" });
       refresh();
+      showToast("Registro removido com sucesso.");
     } catch (e) {
       setError(e.message);
+      showToast(e.message, "error");
     }
   }
   async function decideReservation(id, action) {
@@ -197,6 +206,7 @@ function App() {
       refresh();
     } catch (e) {
       setError(e.message);
+      showToast(e.message, "error");
     }
   }
   async function updatePayment(id, action) {
@@ -205,6 +215,7 @@ function App() {
       refresh();
     } catch (e) {
       setError(e.message);
+      showToast(e.message, "error");
     }
   }
   async function serviceAction(id, action) {
@@ -215,8 +226,8 @@ function App() {
     } catch (e) { setError(e.message); }
   }
   async function updateProfile(profile) {
-    try { await request("/api/users/me", { method: "PUT", body: JSON.stringify(profile) }); await refresh(); }
-    catch (e) { setError(e.message); }
+    try { await request("/api/users/me", { method: "PUT", body: JSON.stringify(profile) }); await refresh(); showToast("Alterações salvas com sucesso."); }
+    catch (e) { setError(e.message); showToast(e.message, "error"); }
   }
   if (!token)
     return (
@@ -306,6 +317,7 @@ function App() {
         {active === "Pets cadastrados" && isAdmin && <AdminPets pets={data.pets} />}
         {active === "Clientes" && isAdmin && <Clients clients={data.clients} reservations={data.reservations} payments={data.payments} pets={data.pets} />}
       </section>
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       {editor && editor.type === "service" && <ServiceEditor editor={editor} onClose={() => setEditor(null)} onSave={saveEditor} loading={loading} />}
       {editor && editor.type !== "service" && (
         <Editor
@@ -934,6 +946,9 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
       </form>
     </div>
   );
+}
+function Toast({ message, type, onClose }) {
+  return <div className={`toast ${type}`} role="status"><span>{type === "success" ? "✓" : "!"}</span><p>{message}</p><button onClick={onClose} aria-label="Fechar notificação">×</button></div>;
 }
 function Field({ label, children }) {
   return (

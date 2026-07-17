@@ -53,3 +53,7 @@
 .cep-field { display: flex; gap: 8px; }
 .cep-field button { border: 0; border-radius: 10px; padding: 0 12px; background: var(--ocean); color: var(--white); font-size: 12px; font-weight: 800; white-space: nowrap; }
 .field-error { color: #b42318; font-size: 11px; }
+.toast { position: fixed; z-index: 30; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 10px; max-width: min(390px, calc(100vw - 40px)); padding: 13px 14px; border-radius: 12px; box-shadow: 0 14px 35px rgba(10,22,128,.22); color: var(--ocean); background: var(--butter); animation: toast-in .2s ease-out; }
+.toast.success { background: #e4f7ec; color: #087443; }.toast.error { background: #fff0ed; color: #b42318; }
+.toast span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: currentColor; color: var(--white); font-size: 13px; font-weight: 900; }.toast p { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.35; }.toast button { margin-left: 3px; border: 0; background: transparent; color: currentColor; font-size: 20px; line-height: 1; cursor: pointer; }
+@keyframes toast-in { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
