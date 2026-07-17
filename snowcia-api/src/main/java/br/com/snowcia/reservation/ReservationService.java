@@ -3,6 +3,9 @@ package br.com.snowcia.reservation;
 import java.util.List;
 
 import br.com.snowcia.notification.WhatsAppNotificationService;
+import br.com.snowcia.offering.ServiceOffering;
+import br.com.snowcia.offering.ServiceOfferingRepository;
+import br.com.snowcia.offering.ServiceTarget;
 import br.com.snowcia.payment.Payment;
 import br.com.snowcia.payment.PaymentMethod;
 import br.com.snowcia.payment.PaymentRepository;
@@ -26,17 +29,19 @@ public class ReservationService {
     private final PetRepository petRepository;
     private final PaymentRepository paymentRepository;
     private final ReservationPricingService pricingService;
+    private final ServiceOfferingRepository serviceOfferingRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final String paymentUrlBase;
 
     public ReservationService(ReservationRepository reservationRepository, PetRepository petRepository,
-            PaymentRepository paymentRepository, ReservationPricingService pricingService,
+            PaymentRepository paymentRepository, ReservationPricingService pricingService, ServiceOfferingRepository serviceOfferingRepository,
             WhatsAppNotificationService whatsAppNotificationService,
             @Value("${snowcia.payment.public-url:http://localhost:5173/pagamento/}") String paymentUrlBase) {
         this.reservationRepository = reservationRepository;
         this.petRepository = petRepository;
         this.paymentRepository = paymentRepository;
         this.pricingService = pricingService;
+        this.serviceOfferingRepository = serviceOfferingRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
         this.paymentUrlBase = paymentUrlBase;
     }
@@ -44,11 +49,12 @@ public class ReservationService {
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
         validateDates(request);
         var pet = findOwnedPet(owner, request.petId());
+        var offering = findOffering(pet, request.serviceOfferingId());
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
-        var price = pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate());
-        var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), request.checkInDate(),
-                request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price.totalAmount()));
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : offering.getPriceConditions().getFirst().getPrice();
+        var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, request.checkInDate(),
+                request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
     }
 
@@ -65,6 +71,7 @@ public class ReservationService {
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
         validateDates(request);
         var reservation = findOwnedReservation(owner, id);
+        var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser alteradas");
         }
@@ -73,9 +80,10 @@ public class ReservationService {
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         validateServiceForPet(reservation.getPet(), request.serviceType());
-        var price = pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate());
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : offering.getPriceConditions().getFirst().getPrice();
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
-        reservation.updateTotalAmount(price.totalAmount());
+        reservation.updateService(request.serviceType(), offering);
+        reservation.updateTotalAmount(price);
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
 
@@ -136,6 +144,19 @@ public class ReservationService {
         if ((pet.getSpecies() == PetSpecies.DOG && catSitter) || (pet.getSpecies() == PetSpecies.CAT && !catSitter)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O serviço selecionado não é compatível com a espécie do pet");
         }
+    }
+
+    private ServiceOffering findOffering(Pet pet, Long id) {
+        if (id == null) return null;
+        var offering = serviceOfferingRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado"));
+        var validTarget = offering.getTarget() == ServiceTarget.BOTH
+                || (offering.getTarget() == ServiceTarget.DOG && pet.getSpecies() == PetSpecies.DOG)
+                || (offering.getTarget() == ServiceTarget.CAT && pet.getSpecies() == PetSpecies.CAT);
+        if (!offering.isActive() || !validTarget) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Serviço indisponível para este pet");
+        }
+        return offering;
     }
 
     private void ensureAvailable(Pet pet, ReservationRequest request, Long reservationId) {

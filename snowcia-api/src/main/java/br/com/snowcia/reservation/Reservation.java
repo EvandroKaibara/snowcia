@@ -6,6 +6,7 @@ import java.time.LocalTime;
 import java.math.BigDecimal;
 
 import br.com.snowcia.pet.Pet;
+import br.com.snowcia.offering.ServiceOffering;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,6 +53,10 @@ public class Reservation {
     @Column(name = "service_type", nullable = false, length = 30)
     private ReservationServiceType serviceType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_offering_id")
+    private ServiceOffering serviceOffering;
+
     @Column(length = 500)
     private String notes;
 
@@ -73,11 +78,12 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, ReservationServiceType serviceType, LocalDate checkInDate, LocalDate checkOutDate,
+    public Reservation(Pet pet, ReservationServiceType serviceType, ServiceOffering serviceOffering, LocalDate checkInDate, LocalDate checkOutDate,
             LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
+        this.serviceOffering = serviceOffering;
         this.totalAmount = totalAmount;
         update(checkInDate, checkOutDate, checkInTime, checkOutTime, notes);
     }
@@ -107,6 +113,7 @@ public class Reservation {
         status = ReservationStatus.DECLINED;
         declineReason = reason;
     }
+    public void updateService(ReservationServiceType serviceType, ServiceOffering serviceOffering) { this.serviceType = serviceType; this.serviceOffering = serviceOffering; }
 
     public void complete() { status = ReservationStatus.COMPLETED; }
     public void updateInternalNotes(String notes) { internalNotes = notes; }
@@ -130,6 +137,7 @@ public class Reservation {
     public LocalTime getCheckOutTime() { return checkOutTime; }
     public ReservationStatus getStatus() { return status; }
     public ReservationServiceType getServiceType() { return serviceType; }
+    public ServiceOffering getServiceOffering() { return serviceOffering; }
     public String getNotes() { return notes; }
     public String getDeclineReason() { return declineReason; }
     public String getInternalNotes() { return internalNotes; }

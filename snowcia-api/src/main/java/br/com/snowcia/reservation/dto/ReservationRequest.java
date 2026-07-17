@@ -11,6 +11,7 @@ import br.com.snowcia.reservation.ReservationServiceType;
 public record ReservationRequest(
         @NotNull Long petId,
         @NotNull ReservationServiceType serviceType,
+        Long serviceOfferingId,
         @NotNull @FutureOrPresent LocalDate checkInDate,
         @NotNull @FutureOrPresent LocalDate checkOutDate,
         @NotNull LocalTime checkInTime,

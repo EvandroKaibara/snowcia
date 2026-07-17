@@ -97,7 +97,7 @@ function App() {
         isAdmin ? request("/api/payments") : Promise.resolve([]),
         request("/api/users/me"),
         isAdmin ? request("/api/users/clients") : Promise.resolve([]),
-        isAdmin ? request("/api/services") : Promise.resolve([]),
+        request("/api/services"),
       ]);
       setData({ pets, reservations, payments, profile, clients, serviceOfferings });
     } catch (e) {
@@ -155,7 +155,7 @@ function App() {
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...form, petId: Number(form.petId) }),
+            body: JSON.stringify({ ...form, petId: Number(form.petId), serviceOfferingId: form.serviceOfferingId ? Number(form.serviceOfferingId) : null }),
           },
         );
       if (type === "service")
@@ -309,6 +309,7 @@ function App() {
         <Editor
           editor={editor}
           pets={data.pets}
+          serviceOfferings={data.serviceOfferings}
           onClose={() => setEditor(null)}
           onSave={saveEditor}
           loading={loading}
@@ -656,7 +657,7 @@ function ReservationDetail({
       <div className="pet-dot">🐾</div>
       <div>
         <strong>
-          {reservation.petName} · {serviceName(reservation.serviceType)}
+          {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
         <small>
           {formatDate(reservation.checkInDate)}{" "}
@@ -761,7 +762,7 @@ function ServiceEditor({ editor, onClose, onSave, loading }) {
 }
 function Toggle({ label, checked, onChange }) { return <label className="toggle-field"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>; }
 
-function Editor({ editor, pets, onClose, onSave, loading }) {
+function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
   const { type, item } = editor;
   const initial =
     item ??
@@ -775,6 +776,7 @@ function Editor({ editor, pets, onClose, onSave, loading }) {
           checkInTime: "08:00",
           checkOutTime: "18:00",
           notes: "",
+          serviceOfferingId: "",
         });
   const [form, setForm] = useState(initial);
   return (
@@ -841,7 +843,10 @@ function Editor({ editor, pets, onClose, onSave, loading }) {
               <select
                 value={form.petId}
                 disabled={Boolean(item)}
-                onChange={(e) => setForm({ ...form, petId: e.target.value })}
+                onChange={(e) => {
+                  const pet = pets.find((value) => String(value.id) === e.target.value);
+                  setForm({ ...form, petId: e.target.value, serviceOfferingId: "", serviceType: pet?.species === "CAT" ? "CAT_SITTER_DAILY" : "HOSTING_24H" });
+                }}
               >
                 {pets.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -850,6 +855,11 @@ function Editor({ editor, pets, onClose, onSave, loading }) {
                 ))}
               </select>
             </Field>
+            {(() => {
+              const pet = pets.find((value) => String(value.id) === String(form.petId));
+              const available = serviceOfferings.filter((service) => service.active && (service.target === "BOTH" || (service.target === "DOG" && pet?.species === "DOG") || (service.target === "CAT" && pet?.species === "CAT")));
+              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
+            })()}
             <Field label="Data de entrada">
               <input
                 required
@@ -950,7 +960,7 @@ function ReservationRow({ reservation }) {
         <div>
           <h3>{reservation.petName}</h3>
           <p>
-            {serviceName(reservation.serviceType)} ·{" "}
+            {reservation.serviceName || serviceName(reservation.serviceType)} ·{" "}
             {formatCurrency(reservation.totalAmount)}
           </p>
         </div>
