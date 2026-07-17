@@ -802,11 +802,12 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
           checkOutTime: "18:00",
           notes: "",
           serviceOfferingId: "",
+          extraQuantities: {},
         });
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
-  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime);
+  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities);
   return (
     <div className="modal-backdrop">
       <form
@@ -881,8 +882,9 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
               const available = serviceOfferings.filter((service) => service.active && (service.target === "BOTH" || (service.target === "DOG" && pet?.species === "DOG") || (service.target === "CAT" && pet?.species === "CAT")));
-              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
+              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
+            {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
             <Field label="Data de entrada">
               <input
                 required
@@ -1041,22 +1043,41 @@ function labelOf(v) {
 function serviceName(id) {
   return services.find(([key]) => key === id)?.[1] ?? id;
 }
-function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00") {
+function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00", extraQuantities = {}) {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;
   const conditions = service.priceConditions ?? [];
   if (!conditions.length) return null;
   const priceFor = (date) => Number((conditions.find((condition) => isHolidayCondition(condition.name) && isBrazilianNationalHoliday(date)) ?? conditions.find((condition) => conditionMatchesDay(condition.name, date)) ?? conditions[0]).price);
   const firstDay = new Date(`${checkInDate}T12:00:00`);
+  let total = 0;
+  let chargeableDays = 1;
   if (service.billingType === "DAILY") {
     const start = new Date(`${checkInDate}T${checkInTime}:00`);
     const end = new Date(`${checkOutDate}T${checkOutTime}:00`);
-    const dailyCount = Math.max(1, Math.ceil((end - start) / 86400000));
-    return Array.from({ length: dailyCount }, (_, index) => priceFor(new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index, 12))).reduce((total, price) => total + price, 0);
+    chargeableDays = Math.max(1, Math.ceil((end - start) / 86400000));
+    total = Array.from({ length: chargeableDays }, (_, index) => priceFor(new Date(firstDay.getFullYear(), firstDay.getMonth(), firstDay.getDate() + index, 12))).reduce((sum, price) => sum + price, 0);
+  } else {
+    const isCatSitter = service.category === "CAT_SITTER" || service.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("cat sitter");
+    const lastChargeableDay = (checkOutDate === checkInDate || isCatSitter) ? new Date(new Date(`${checkOutDate}T12:00:00`).getFullYear(), new Date(`${checkOutDate}T12:00:00`).getMonth(), new Date(`${checkOutDate}T12:00:00`).getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);
+    for (let day = firstDay; day < lastChargeableDay; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) {
+      total += priceFor(day);
+      chargeableDays += 1;
+    }
+    chargeableDays = Math.max(1, chargeableDays - 1);
   }
+  const weekendHolidayDays = countWeekendHolidayDays(checkInDate, checkOutDate);
+  const extrasTotal = (service.extras ?? []).reduce((sum, extra) => {
+    const quantity = Math.max(0, Number(extraQuantities?.[extra.code] ?? 0));
+    if (!quantity) return sum;
+    const multiplier = extra.code === "weekend_holiday" ? weekendHolidayDays : extra.pricing === "PER_DAY" ? chargeableDays : 1;
+    return sum + Number(extra.price ?? 0) * quantity * multiplier;
+  }, 0);
+  return total + extrasTotal;
+}
+function countWeekendHolidayDays(checkInDate, checkOutDate) {
   let total = 0;
-  const isCatSitter = service.category === "CAT_SITTER" || service.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("cat sitter");
-  const lastChargeableDay = (checkOutDate === checkInDate || isCatSitter) ? new Date(new Date(`${checkOutDate}T12:00:00`).getFullYear(), new Date(`${checkOutDate}T12:00:00`).getMonth(), new Date(`${checkOutDate}T12:00:00`).getDate() + 1, 12) : new Date(`${checkOutDate}T12:00:00`);
-  for (let day = firstDay; day < lastChargeableDay; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) total += priceFor(day);
+  const lastDay = new Date(`${checkOutDate}T12:00:00`);
+  for (let day = new Date(`${checkInDate}T12:00:00`); day <= lastDay; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 12)) if ([0, 6].includes(day.getDay()) || isBrazilianNationalHoliday(day)) total += 1;
   return total;
 }
 function conditionMatchesDay(name = "", date) {

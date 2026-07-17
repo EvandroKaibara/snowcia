@@ -2,6 +2,7 @@ package br.com.snowcia.reservation.dto;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Map;
 
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
@@ -16,5 +17,6 @@ public record ReservationRequest(
         @NotNull @FutureOrPresent LocalDate checkOutDate,
         @NotNull LocalTime checkInTime,
         @NotNull LocalTime checkOutTime,
+        Map<String, Integer> extraQuantities,
         @Size(max = 500) String notes) {
 }

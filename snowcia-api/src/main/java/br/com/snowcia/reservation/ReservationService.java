@@ -1,6 +1,7 @@
 package br.com.snowcia.reservation;
 
 import java.util.List;
+import java.util.Map;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Duration;
@@ -58,7 +59,7 @@ public class ReservationService {
         var offering = findOffering(pet, request.serviceOfferingId());
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
         var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
@@ -87,7 +88,7 @@ public class ReservationService {
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         validateServiceForPet(reservation.getPet(), request.serviceType());
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateService(request.serviceType(), offering);
         reservation.updateTotalAmount(price);
@@ -187,6 +188,34 @@ public class ReservationService {
         for (var day = checkIn; day.isBefore(lastChargeableDay); day = day.plusDays(1)) {
             total = total.add(priceForDate(offering, day));
         }
+        return total;
+    }
+
+    private BigDecimal calculateExtrasPrice(ServiceOffering offering, ReservationRequest request) {
+        var quantities = request.extraQuantities() == null ? Map.<String, Integer>of() : request.extraQuantities();
+        var total = BigDecimal.ZERO;
+        for (var extra : offering.getExtras()) {
+            var quantity = quantities.getOrDefault(extra.getCode(), 0);
+            if (quantity < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantidade de adicional inválida");
+            if (quantity == 0) continue;
+            long multiplier = "PER_DAY".equals(extra.getPricing()) ? chargeableDays(offering, request) : 1;
+            if ("weekend_holiday".equals(extra.getCode())) multiplier = weekendOrHolidayDays(request);
+            total = total.add(extra.getPrice().multiply(BigDecimal.valueOf(quantity)).multiply(BigDecimal.valueOf(multiplier)));
+        }
+        return total;
+    }
+
+    private long chargeableDays(ServiceOffering offering, ReservationRequest request) {
+        if (offering.getBillingType() == br.com.snowcia.offering.BillingType.DAILY) {
+            var minutes = Duration.between(LocalDateTime.of(request.checkInDate(), request.checkInTime()), LocalDateTime.of(request.checkOutDate(), request.checkOutTime())).toMinutes();
+            return Math.max(1, (minutes + 1439) / 1440);
+        }
+        return (request.checkOutDate().equals(request.checkInDate()) || isCatSitter(offering)) ? java.time.temporal.ChronoUnit.DAYS.between(request.checkInDate(), request.checkOutDate()) + 1 : Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(request.checkInDate(), request.checkOutDate()));
+    }
+
+    private long weekendOrHolidayDays(ReservationRequest request) {
+        var total = 0L;
+        for (var date = request.checkInDate(); !date.isAfter(request.checkOutDate()); date = date.plusDays(1)) if (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY || isBrazilianNationalHoliday(date)) total++;
         return total;
     }
 
