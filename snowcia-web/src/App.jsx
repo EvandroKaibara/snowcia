@@ -780,6 +780,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
         });
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
+  const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
   const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate);
   return (
     <div className="modal-backdrop">
@@ -873,7 +874,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 }
               />
             </Field>
-            <Field label="Horário de entrada">
+            {showCheckInOut && <><Field label="Horário de entrada">
               <input
                 required
                 type="time"
@@ -882,7 +883,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                   setForm({ ...form, checkInTime: e.target.value })
                 }
               />
-            </Field>
+            </Field></>}
             <Field label="Data de saída">
               <input
                 required
@@ -894,7 +895,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                 }
               />
             </Field>
-            <Field label="Horário de saída">
+            {showCheckInOut && <Field label="Horário de saída">
               <input
                 required
                 type="time"
@@ -903,7 +904,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
                   setForm({ ...form, checkOutTime: e.target.value })
                 }
               />
-            </Field>
+            </Field>}
             <Field label="Observações">
               <textarea
                 value={form.notes ?? ""}
