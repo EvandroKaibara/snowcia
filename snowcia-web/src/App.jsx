@@ -1108,7 +1108,7 @@ function conditionMatchesDay(name = "", date) {
   const day = date.getDay();
   const condition = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if ((condition.includes("feriado") || condition.includes("holiday")) && isBrazilianNationalHoliday(date)) return true;
-  if (condition.includes("fim de semana") || condition.includes("weekend")) return day === 0 || day === 6;
+  if (condition.includes("fim de semana") || condition.includes("weekend")) return day === 0 || day === 6 || ((condition.includes("sexta") || condition.includes("friday")) && day === 5);
   if (condition.includes("segunda") && condition.includes("quinta")) return day >= 1 && day <= 4;
   if (condition.includes("dia util") || condition.includes("weekday")) return day >= 1 && day <= 5;
   return ((condition.includes("segunda") || condition.includes("monday")) && day === 1)

@@ -272,7 +272,8 @@ public class ReservationService {
                 .replaceAll("\\p{M}", "").toLowerCase();
         if ((condition.contains("feriado") || condition.contains("holiday")) && isBrazilianNationalHoliday(date)) return true;
         if (condition.contains("fim de semana") || condition.contains("weekend")) {
-            return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+            return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY
+                    || ((condition.contains("sexta") || condition.contains("friday")) && day == DayOfWeek.FRIDAY);
         }
         if (condition.contains("segunda") && condition.contains("quinta")) {
             return day.getValue() >= DayOfWeek.MONDAY.getValue() && day.getValue() <= DayOfWeek.THURSDAY.getValue();
