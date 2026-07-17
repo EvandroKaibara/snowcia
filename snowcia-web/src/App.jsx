@@ -777,11 +777,6 @@ function Editor({ editor, pets, onClose, onSave, loading }) {
           notes: "",
         });
   const [form, setForm] = useState(initial);
-  const selectedPet = pets.find((pet) => String(pet.id) === String(form.petId));
-  const availableServices =
-    selectedPet?.species === "DOG"
-      ? services.filter(([id]) => !id.startsWith("CAT_SITTER"))
-      : services;
   return (
     <div className="modal-backdrop">
       <form
@@ -846,40 +841,11 @@ function Editor({ editor, pets, onClose, onSave, loading }) {
               <select
                 value={form.petId}
                 disabled={Boolean(item)}
-                onChange={(e) => {
-                  const pet = pets.find(
-                    (value) => String(value.id) === e.target.value,
-                  );
-                  const allowed =
-                    pet?.species === "DOG"
-                      ? services.filter(([id]) => !id.startsWith("CAT_SITTER"))
-                      : services;
-                  setForm({
-                    ...form,
-                    petId: e.target.value,
-                    serviceType: allowed.some(([id]) => id === form.serviceType)
-                      ? form.serviceType
-                      : allowed[0][0],
-                  });
-                }}
+                onChange={(e) => setForm({ ...form, petId: e.target.value })}
               >
                 {pets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Serviço">
-              <select
-                value={form.serviceType}
-                onChange={(e) =>
-                  setForm({ ...form, serviceType: e.target.value })
-                }
-              >
-                {availableServices.map(([id, name, price]) => (
-                  <option key={id} value={id}>
-                    {name} — {price}
                   </option>
                 ))}
               </select>
