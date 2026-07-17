@@ -132,8 +132,8 @@ public class ReservationService {
     }
 
     private void validateDates(ReservationRequest request) {
-        if (!request.checkOutDate().isAfter(request.checkInDate())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A saída deve ser posterior à entrada");
+        if (request.checkOutDate().isBefore(request.checkInDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A saída não pode ser anterior à entrada");
         }
         if (request.checkInDate().equals(request.checkOutDate()) && !request.checkOutTime().isAfter(request.checkInTime())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A saída deve ser posterior à entrada");
@@ -169,7 +169,8 @@ public class ReservationService {
             return priceForDate(offering, checkIn);
         }
         var total = BigDecimal.ZERO;
-        for (var day = checkIn; day.isBefore(checkOut); day = day.plusDays(1)) {
+        var lastChargeableDay = checkOut.equals(checkIn) ? checkOut.plusDays(1) : checkOut;
+        for (var day = checkIn; day.isBefore(lastChargeableDay); day = day.plusDays(1)) {
             total = total.add(priceForDate(offering, day));
         }
         return total;
