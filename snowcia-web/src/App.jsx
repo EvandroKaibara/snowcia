@@ -362,8 +362,8 @@ function AuthScreen({
                 <input
                   required
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="5511999999999"
+                  onChange={(e) => setForm({ ...form, phone: formatWhatsApp(e.target.value) })}
+                  placeholder="+55 11 99999-9999"
                 />
               </Field>
             </>
@@ -575,9 +575,22 @@ function Pets({ pets, openEditor, onDelete }) {
 
 function Profile({ profile, onSave }) {
   const [form, setForm] = useState(profile ?? { name: "", phone: "", address: "" });
-  useEffect(() => { setForm(profile ?? { name: "", phone: "", address: "" }); }, [profile]);
+  const [cep, setCep] = useState("");
+  const [cepError, setCepError] = useState("");
+  useEffect(() => { setForm(profile ?? { name: "", phone: "", address: "" }); setCep((profile?.address ?? "").match(/CEP\s*(\d{5}-?\d{3})/i)?.[1] ?? ""); }, [profile]);
+  const lookupCep = async () => {
+    const digits = cep.replace(/\D/g, "");
+    if (digits.length !== 8) return setCepError("Informe os 8 dígitos do CEP.");
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const data = await response.json();
+      if (data.erro) throw new Error();
+      const address = [data.logradouro, data.bairro, [data.localidade, data.uf].filter(Boolean).join(" - "), `CEP ${formatCep(digits)}`].filter(Boolean).join(", ");
+      setForm({ ...form, address }); setCep(formatCep(digits)); setCepError("");
+    } catch { setCepError("CEP não encontrado. Confira e tente novamente."); }
+  };
   if (!profile) return <Empty text="Carregando perfil..." />;
-  return <section className="list-card"><SectionTitle title="Meus dados" /><form className="editor-modal profile-form" onSubmit={(e) => { e.preventDefault(); onSave(form); }}><Field label="Nome"><input required value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label="E-mail"><input disabled value={form.email ?? ""} /></Field><Field label="WhatsApp"><input required value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field><Field label="Endereço"><textarea value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field><button className="primary-button">Salvar alterações</button></form></section>;
+  return <section className="list-card"><SectionTitle title="Meus dados" /><form className="editor-modal profile-form" onSubmit={(e) => { e.preventDefault(); onSave(form); }}><Field label="Nome"><input required value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label="E-mail"><input disabled value={form.email ?? ""} /></Field><Field label="WhatsApp"><input required value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: formatWhatsApp(e.target.value) })} placeholder="+55 11 99999-9999" /></Field><Field label="CEP"><div className="cep-field"><input inputMode="numeric" value={cep} onChange={(e) => setCep(formatCep(e.target.value))} onBlur={lookupCep} placeholder="00000-000" /><button type="button" onClick={lookupCep}>Buscar CEP</button></div>{cepError && <small className="field-error">{cepError}</small>}</Field><Field label="Endereço"><textarea value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Preenchido automaticamente pelo CEP; complemente com número e apartamento." /></Field><button className="primary-button">Salvar alterações</button></form></section>;
 }
 
 function AdminPets({ pets }) {
@@ -1074,6 +1087,8 @@ function formatCurrency(v) {
     currency: "BRL",
   }).format(v ?? 0);
 }
+function formatCep(value = "") { const digits = value.replace(/\D/g, "").slice(0, 8); return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits; }
+function formatWhatsApp(value = "") { let digits = value.replace(/\D/g, ""); if (!digits.startsWith("55")) digits = `55${digits}`; digits = digits.slice(0, 13); const country = digits.slice(0, 2), area = digits.slice(2, 4), number = digits.slice(4); if (!area) return `+${country}`; if (!number) return `+${country} ${area}`; return `+${country} ${area} ${number.length > 5 ? `${number.slice(0, 5)}-${number.slice(5)}` : number}`; }
 function today() {
   return new Date().toISOString().slice(0, 10);
 }

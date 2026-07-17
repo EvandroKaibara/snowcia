@@ -50,3 +50,6 @@
 .price-preview span { font-size: 11px; font-weight: 800; letter-spacing: .35px; text-transform: uppercase; }
 .price-preview strong { font-size: 22px; }
 .price-preview small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.cep-field { display: flex; gap: 8px; }
+.cep-field button { border: 0; border-radius: 10px; padding: 0 12px; background: var(--ocean); color: var(--white); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.field-error { color: #b42318; font-size: 11px; }
