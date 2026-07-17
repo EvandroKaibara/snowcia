@@ -20,6 +20,7 @@ const initialData = {
   profile: null,
   clients: [],
   serviceOfferings: [],
+  reservationAdministrators: [],
 };
 const services = [
   ["HOSTING_24H", "Hospedagem (diária 24h)", "R$ 50 - R$ 75/dia"],
@@ -98,15 +99,16 @@ function App() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [pets, reservations, payments, profile, clients, serviceOfferings] = await Promise.all([
+      const [pets, reservations, payments, profile, clients, serviceOfferings, reservationAdministrators] = await Promise.all([
         request("/api/pets"),
         request("/api/reservations"),
         isAdmin ? request("/api/payments") : Promise.resolve([]),
         request("/api/users/me"),
         isAdmin ? request("/api/users/clients") : Promise.resolve([]),
         request("/api/services"),
+        request("/api/users/reservation-administrators"),
       ]);
-      setData({ pets, reservations, payments, profile, clients, serviceOfferings });
+      setData({ pets, reservations, payments, profile, clients, serviceOfferings, reservationAdministrators });
     } catch (e) {
       setError(e.message);
     }
@@ -162,7 +164,7 @@ function App() {
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...form, petId: Number(form.petId), serviceOfferingId: form.serviceOfferingId ? Number(form.serviceOfferingId) : null }),
+            body: JSON.stringify({ ...form, petId: Number(form.petId), serviceOfferingId: form.serviceOfferingId ? Number(form.serviceOfferingId) : null, assignedAdminId: Number(form.assignedAdminId) }),
           },
         );
       if (type === "service")
@@ -324,6 +326,7 @@ function App() {
           editor={editor}
           pets={data.pets}
           serviceOfferings={data.serviceOfferings}
+          reservationAdministrators={data.reservationAdministrators}
           onClose={() => setEditor(null)}
           onSave={saveEditor}
           loading={loading}
@@ -695,6 +698,7 @@ function ReservationDetail({
         {reservation.notes && (
           <small className="note">{reservation.notes}</small>
         )}
+        {reservation.assignedAdminName && <small className="note">Administradora responsável: {reservation.assignedAdminName}</small>}
         {reservation.declineReason && (
           <small className="note decline-reason">
             Motivo da recusa: {reservation.declineReason}
@@ -783,7 +787,7 @@ function ServiceEditor({ editor, onClose, onSave, loading }) {
 }
 function Toggle({ label, checked, onChange }) { return <label className="toggle-field"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>; }
 
-function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
+function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onClose, onSave, loading }) {
   const { type, item } = editor;
   const initial =
     item ??
@@ -798,6 +802,7 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
           checkOutTime: "18:00",
           notes: "",
           serviceOfferingId: "",
+          assignedAdminId: "",
           extraQuantities: {},
         });
   const [form, setForm] = useState(initial);
@@ -881,6 +886,13 @@ function Editor({ editor, pets, serviceOfferings, onClose, onSave, loading }) {
               const available = serviceOfferings.filter((service) => service.active && (service.target === "BOTH" || (service.target === "DOG" && pet?.species === "DOG") || (service.target === "CAT" && pet?.species === "CAT")));
               return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
+            <Field label="Administradora responsável">
+              <select required value={form.assignedAdminId ?? ""} onChange={(e) => setForm({ ...form, assignedAdminId: e.target.value })}>
+                <option value="" disabled>Selecione Jussara ou Isabella</option>
+                {reservationAdministrators.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
+              </select>
+              {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
+            </Field>
             {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
             {isDaycare ? <Field label="Data do serviço">
               <input

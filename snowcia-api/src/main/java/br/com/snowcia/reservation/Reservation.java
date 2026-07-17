@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 
 import br.com.snowcia.pet.Pet;
 import br.com.snowcia.offering.ServiceOffering;
+import br.com.snowcia.user.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,6 +58,10 @@ public class Reservation {
     @JoinColumn(name = "service_offering_id")
     private ServiceOffering serviceOffering;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_admin_id")
+    private AppUser assignedAdmin;
+
     @Column(length = 500)
     private String notes;
 
@@ -78,12 +83,13 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, ReservationServiceType serviceType, ServiceOffering serviceOffering, LocalDate checkInDate, LocalDate checkOutDate,
+    public Reservation(Pet pet, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
             LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
         this.serviceOffering = serviceOffering;
+        this.assignedAdmin = assignedAdmin;
         this.totalAmount = totalAmount;
         update(checkInDate, checkOutDate, checkInTime, checkOutTime, notes);
     }
@@ -115,6 +121,7 @@ public class Reservation {
     }
     public void cancel() { status = ReservationStatus.CANCELLED; }
     public void updateService(ReservationServiceType serviceType, ServiceOffering serviceOffering) { this.serviceType = serviceType; this.serviceOffering = serviceOffering; }
+    public void assignAdmin(AppUser admin) { this.assignedAdmin = admin; }
 
     public void complete() { status = ReservationStatus.COMPLETED; }
     public void updateInternalNotes(String notes) { internalNotes = notes; }
@@ -139,6 +146,7 @@ public class Reservation {
     public ReservationStatus getStatus() { return status; }
     public ReservationServiceType getServiceType() { return serviceType; }
     public ServiceOffering getServiceOffering() { return serviceOffering; }
+    public AppUser getAssignedAdmin() { return assignedAdmin; }
     public String getNotes() { return notes; }
     public String getDeclineReason() { return declineReason; }
     public String getInternalNotes() { return internalNotes; }

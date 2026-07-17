@@ -13,6 +13,7 @@ public record ReservationRequest(
         @NotNull Long petId,
         @NotNull ReservationServiceType serviceType,
         Long serviceOfferingId,
+        @NotNull Long assignedAdminId,
         @NotNull @FutureOrPresent LocalDate checkInDate,
         @NotNull @FutureOrPresent LocalDate checkOutDate,
         @NotNull LocalTime checkInTime,

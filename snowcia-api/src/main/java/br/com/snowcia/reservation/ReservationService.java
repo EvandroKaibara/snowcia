@@ -24,6 +24,7 @@ import br.com.snowcia.reservation.dto.DeclineReservationRequest;
 import br.com.snowcia.reservation.dto.ReservationRequest;
 import br.com.snowcia.reservation.dto.ReservationResponse;
 import br.com.snowcia.user.AppUser;
+import br.com.snowcia.user.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -37,11 +38,12 @@ public class ReservationService {
     private final PaymentRepository paymentRepository;
     private final ReservationPricingService pricingService;
     private final ServiceOfferingRepository serviceOfferingRepository;
+    private final UserRepository userRepository;
     private final WhatsAppNotificationService whatsAppNotificationService;
     private final String paymentUrlBase;
 
     public ReservationService(ReservationRepository reservationRepository, PetRepository petRepository,
-            PaymentRepository paymentRepository, ReservationPricingService pricingService, ServiceOfferingRepository serviceOfferingRepository,
+            PaymentRepository paymentRepository, ReservationPricingService pricingService, ServiceOfferingRepository serviceOfferingRepository, UserRepository userRepository,
             WhatsAppNotificationService whatsAppNotificationService,
             @Value("${snowcia.payment.public-url:http://localhost:5173/pagamento/}") String paymentUrlBase) {
         this.reservationRepository = reservationRepository;
@@ -49,6 +51,7 @@ public class ReservationService {
         this.paymentRepository = paymentRepository;
         this.pricingService = pricingService;
         this.serviceOfferingRepository = serviceOfferingRepository;
+        this.userRepository = userRepository;
         this.whatsAppNotificationService = whatsAppNotificationService;
         this.paymentUrlBase = paymentUrlBase;
     }
@@ -56,19 +59,20 @@ public class ReservationService {
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
         var pet = findOwnedPet(owner, request.petId());
         var offering = findOffering(pet, request.serviceOfferingId());
+        var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeDaycareDates(offering, request);
         validateDates(request);
         validateServiceForPet(pet, request.serviceType());
         ensureAvailable(pet, request, null);
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
-        var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, request.checkInDate(),
+        var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, assignedAdmin, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
     }
 
     public List<ReservationResponse> list(AppUser user) {
         finalizePastReservations();
-        var reservations = user.isAdmin() ? reservationRepository.findAllByOrderByCheckInDateAsc()
+        var reservations = user.isAdmin() ? reservationRepository.findAllByAssignedAdminIdOrderByCheckInDateAsc(user.getId())
                 : reservationRepository.findAllByPetOwnerIdOrderByCheckInDateAsc(user.getId());
         return reservations.stream().map(ReservationResponse::from).toList();
     }
@@ -80,6 +84,7 @@ public class ReservationService {
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
         var reservation = findOwnedReservation(owner, id);
         var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
+        var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeDaycareDates(offering, request);
         validateDates(request);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
@@ -93,13 +98,14 @@ public class ReservationService {
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
         reservation.updateService(request.serviceType(), offering);
+        reservation.assignAdmin(assignedAdmin);
         reservation.updateTotalAmount(price);
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
 
     public ReservationResponse approve(AppUser admin, Long id) {
         ensureAdmin(admin);
-        var reservation = findReservation(id);
+        var reservation = findAccessibleReservation(admin, id);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Apenas reservas pendentes podem ser aprovadas");
         }
@@ -116,7 +122,7 @@ public class ReservationService {
 
     public ReservationResponse decline(AppUser admin, Long id, DeclineReservationRequest request) {
         ensureAdmin(admin);
-        var reservation = findReservation(id);
+        var reservation = findAccessibleReservation(admin, id);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Apenas reservas pendentes podem ser recusadas");
         }
@@ -148,8 +154,8 @@ public class ReservationService {
         }
     }
 
-    public ReservationResponse complete(AppUser admin, Long id) { ensureAdmin(admin); var reservation = findReservation(id); if (reservation.getStatus() != ReservationStatus.CONFIRMED) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas confirmadas podem ser finalizadas"); reservation.complete(); return ReservationResponse.from(reservationRepository.save(reservation)); }
-    public ReservationResponse updateInternalNotes(AppUser admin, Long id, String notes) { ensureAdmin(admin); var reservation = findReservation(id); reservation.updateInternalNotes(normalize(notes)); return ReservationResponse.from(reservationRepository.save(reservation)); }
+    public ReservationResponse complete(AppUser admin, Long id) { ensureAdmin(admin); var reservation = findAccessibleReservation(admin, id); if (reservation.getStatus() != ReservationStatus.CONFIRMED) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas confirmadas podem ser finalizadas"); reservation.complete(); return ReservationResponse.from(reservationRepository.save(reservation)); }
+    public ReservationResponse updateInternalNotes(AppUser admin, Long id, String notes) { ensureAdmin(admin); var reservation = findAccessibleReservation(admin, id); reservation.updateInternalNotes(normalize(notes)); return ReservationResponse.from(reservationRepository.save(reservation)); }
 
     private void finalizePastReservations() {
         var finished = reservationRepository.findAllByStatusAndCheckOutDateBefore(ReservationStatus.CONFIRMED, java.time.LocalDate.now());
@@ -196,7 +202,7 @@ public class ReservationService {
 
     private ReservationRequest normalizeDaycareDates(ServiceOffering offering, ReservationRequest request) {
         if (!request.serviceType().name().startsWith("DAYCARE") && !isDaycare(offering)) return request;
-        return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
+        return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
     }
 
     private boolean isDaycare(ServiceOffering offering) {
@@ -327,6 +333,12 @@ public class ReservationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pet não encontrado"));
     }
 
+    private AppUser findReservationAdministrator(Long id) {
+        var admin = userRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Administradora não encontrada"));
+        if (!admin.isAdmin() || !(admin.getEmail().equals("jussara@snowcia.local") || admin.getEmail().equals("isabella@snowcia.local"))) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione Jussara ou Isabella para a reserva");
+        return admin;
+    }
+
     private Reservation findOwnedReservation(AppUser owner, Long id) {
         return reservationRepository.findByIdAndPetOwnerId(id, owner.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva não encontrada"));
@@ -338,7 +350,7 @@ public class ReservationService {
     }
 
     private Reservation findAccessibleReservation(AppUser user, Long id) {
-        return user.isAdmin() ? findReservation(id) : findOwnedReservation(user, id);
+        return user.isAdmin() ? reservationRepository.findByIdAndAssignedAdminId(id, user.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva não encontrada")) : findOwnedReservation(user, id);
     }
 
     private void ensureAdmin(AppUser user) {
