@@ -177,15 +177,17 @@ public class ReservationService {
 
     private BigDecimal priceForDate(ServiceOffering offering, LocalDate date) {
         return offering.getPriceConditions().stream()
-                .filter(condition -> appliesTo(condition.getName(), date.getDayOfWeek()))
+                .filter(condition -> appliesTo(condition.getName(), date))
                 .findFirst()
                 .orElse(offering.getPriceConditions().getFirst())
                 .getPrice();
     }
 
-    private boolean appliesTo(String conditionName, DayOfWeek day) {
+    private boolean appliesTo(String conditionName, LocalDate date) {
+        var day = date.getDayOfWeek();
         var condition = Normalizer.normalize(conditionName, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "").toLowerCase();
+        if ((condition.contains("feriado") || condition.contains("holiday")) && isBrazilianNationalHoliday(date)) return true;
         if (condition.contains("fim de semana") || condition.contains("weekend")) {
             return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
         }
@@ -202,6 +204,28 @@ public class ReservationService {
                 || ((condition.contains("sexta") || condition.contains("friday")) && day == DayOfWeek.FRIDAY)
                 || ((condition.contains("sabado") || condition.contains("saturday")) && day == DayOfWeek.SATURDAY)
                 || ((condition.contains("domingo") || condition.contains("sunday")) && day == DayOfWeek.SUNDAY);
+    }
+
+    private boolean isBrazilianNationalHoliday(LocalDate date) {
+        var fixedHoliday = switch (date.getMonthValue()) {
+            case 1 -> date.getDayOfMonth() == 1;
+            case 4 -> date.getDayOfMonth() == 21;
+            case 5 -> date.getDayOfMonth() == 1;
+            case 9 -> date.getDayOfMonth() == 7;
+            case 10 -> date.getDayOfMonth() == 12;
+            case 11 -> date.getDayOfMonth() == 2 || date.getDayOfMonth() == 15 || date.getDayOfMonth() == 20;
+            case 12 -> date.getDayOfMonth() == 25;
+            default -> false;
+        };
+        return fixedHoliday || date.equals(easterSunday(date.getYear()).minusDays(2));
+    }
+
+    private LocalDate easterSunday(int year) {
+        int a = year % 19, b = year / 100, c = year % 100, d = b / 4, e = b % 4, f = (b + 8) / 25;
+        int g = (b - f + 1) / 3, h = (19 * a + b - d - g + 15) % 30, i = c / 4, k = c % 4;
+        int l = (32 + 2 * e + 2 * i - h - k) % 7, m = (a + 11 * h + 22 * l) / 451;
+        int month = (h + l - 7 * m + 114) / 31, day = (h + l - 7 * m + 114) % 31 + 1;
+        return LocalDate.of(year, month, day);
     }
 
     private void ensureAvailable(Pet pet, ReservationRequest request, Long reservationId) {
