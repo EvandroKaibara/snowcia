@@ -9,6 +9,7 @@ const navigation = [
   ["Perfil", "☺"],
   ["Pagamentos", "◈"],
 ];
+const adminNavigation = [["Visão geral", "⌂"], ["Reservas", "▣"], ["Pagamentos", "◈"], ["Pets cadastrados", "♧"], ["Clientes", "☻"], ["Perfil", "☺"]];
 const species = ["DOG", "CAT", "BIRD", "OTHER"];
 const initialData = {
   pets: [],
@@ -89,13 +90,14 @@ function App() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [pets, reservations, payments, profile] = await Promise.all([
+      const [pets, reservations, payments, profile, clients] = await Promise.all([
         request("/api/pets"),
         request("/api/reservations"),
         isAdmin ? request("/api/payments") : Promise.resolve([]),
         request("/api/users/me"),
+        isAdmin ? request("/api/users/clients") : Promise.resolve([]),
       ]);
-      setData({ pets, reservations, payments, profile, clients: [] });
+      setData({ pets, reservations, payments, profile, clients });
     } catch (e) {
       setError(e.message);
     }
@@ -225,8 +227,7 @@ function App() {
           <span>✦</span> snowcia
         </div>
         <nav>
-          {navigation
-            .filter(([label]) => label !== "Pagamentos" || isAdmin)
+          {(isAdmin ? adminNavigation : navigation.filter(([label]) => label !== "Pagamentos"))
             .map(([label, icon]) => (
               <button
                 key={label}
@@ -285,6 +286,8 @@ function App() {
         {active === "Pagamentos" && isAdmin && (
           <Payments payments={data.payments} updatePayment={updatePayment} />
         )}
+        {active === "Pets cadastrados" && isAdmin && <AdminPets pets={data.pets} />}
+        {active === "Clientes" && isAdmin && <Clients clients={data.clients} reservations={data.reservations} payments={data.payments} pets={data.pets} />}
       </section>
       {editor && (
         <Editor
@@ -557,6 +560,18 @@ function Profile({ profile, onSave }) {
   if (!profile) return <Empty text="Carregando perfil..." />;
   return <section className="list-card"><SectionTitle title="Meus dados" /><form className="editor-modal profile-form" onSubmit={(e) => { e.preventDefault(); onSave(form); }}><Field label="Nome"><input required value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field><Field label="E-mail"><input disabled value={form.email ?? ""} /></Field><Field label="WhatsApp"><input required value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field><Field label="Endereço"><textarea value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field><button className="primary-button">Salvar alterações</button></form></section>;
 }
+
+function AdminPets({ pets }) {
+  const [filter, setFilter] = useState("ALL");
+  const rows = filter === "ALL" ? pets : pets.filter((pet) => pet.species === filter);
+  return <section className="list-card"><SectionTitle title="Pets cadastrados" /><div className="row-actions"><button onClick={() => setFilter("ALL")}>Todos</button><button onClick={() => setFilter("DOG")}>Cachorro</button><button onClick={() => setFilter("CAT")}>Gato</button></div><div className="item-grid">{rows.map((pet) => <article className="pet-card" key={pet.id}><div className="pet-emoji">🐾</div><h3>{pet.name}</h3><p>{labelOf(pet.species)} · {pet.breed || "Sem raça informada"}</p><small>Gênero: {pet.gender || "Não informado"}</small><small>Vacinação: {pet.vaccinationsCurrent ? "Em dia" : "Não informado"}</small><small>Antipulgas: {pet.fleaPreventionCurrent ? "Em dia" : "Não informado"}</small>{pet.healthConditions && <small>Doenças: {pet.healthConditions}</small>}{pet.specialCare && <small>Cuidados: {pet.specialCare}</small>}{pet.allergies && <small>Alergias: {pet.allergies}</small>}{pet.importantHabits && <small>Hábitos: {pet.importantHabits}</small>}</article>)}</div>{!rows.length && <Empty text="Nenhum pet encontrado." />}</section>;
+}
+
+function Clients({ clients, pets, reservations, payments }) {
+  const [selected, setSelected] = useState(null); const current = clients.find((client) => client.id === selected);
+  if (current) { const clientPets = pets.filter((pet) => pet.ownerId === current.id); const clientReservations = reservations.filter((reservation) => reservation.ownerEmail === current.email); const clientPayments = payments.filter((payment) => clientReservations.some((reservation) => reservation.id === payment.reservationId)); return <section className="list-card"><button onClick={() => setSelected(null)}>← Voltar</button><SectionTitle title={current.name} /><p>{current.email} · {current.phone || "Sem telefone"}</p><p>{current.address || "Sem endereço"}</p><h3>Pets cadastrados</h3><p>{clientPets.map((pet) => pet.name).join(", ") || "Nenhum"}</p><h3>Histórico de reservas</h3><p>{clientReservations.length} registro(s)</p><h3>Histórico de pagamentos</h3><p>{clientPayments.length} registro(s)</p></section>; }
+  return <section className="list-card"><SectionTitle title="Clientes" />{clients.map((client) => <div className="reservation-row detailed" key={client.id}><div><strong>{client.name}</strong><small>{client.email} · {client.phone || "Sem telefone"}</small></div><button onClick={() => setSelected(client.id)}>Abrir</button></div>)}{!clients.length && <Empty text="Nenhum cliente cadastrado." />}</section>;
+}
 function Reservations({
   reservations,
   pets,
@@ -570,7 +585,9 @@ function Reservations({
         ["PENDING", "Pendentes"],
         ["AWAITING_PAYMENT", "Aguardando pagamento"],
         ["CONFIRMED", "Confirmadas"],
+        ["COMPLETED", "Finalizadas"],
         ["DECLINED", "Recusadas"],
+        ["CANCELLED", "Canceladas"],
       ]
     : [["ALL", "Minhas solicitações"]];
   return (
@@ -684,14 +701,16 @@ function ReservationDetail({
   );
 }
 function Payments({ payments, updatePayment }) {
+  const [filter, setFilter] = useState("ALL"); const rows = filter === "ALL" ? payments : payments.filter((payment) => payment.status === filter);
   return (
     <section className="list-card">
       <SectionTitle title="Controle financeiro" />
+      <div className="row-actions"><button onClick={() => setFilter("ALL")}>Todos</button><button onClick={() => setFilter("PENDING")}>Pendentes</button><button onClick={() => setFilter("PAID")}>Confirmados</button><button onClick={() => setFilter("CANCELLED")}>Cancelados</button></div>
       <p className="inline-tip">
         O pagamento integral é criado somente após a reserva ser aprovada.
       </p>
-      {payments.length ? (
-        payments.map((p) => (
+      {rows.length ? (
+        rows.map((p) => (
           <div className="reservation-row detailed" key={p.id}>
             <div className="pet-dot money">◈</div>
             <div>
@@ -715,6 +734,7 @@ function Payments({ payments, updatePayment }) {
                   </button>
                 </>
               )}
+              {p.status !== "PENDING" && <button onClick={() => updatePayment(p.id, "pending")}>Marcar como pendente</button>}
             </div>
           </div>
         ))
@@ -993,6 +1013,7 @@ function labelOf(v) {
       CONFIRMED: "Confirmada",
       DECLINED: "Recusada",
       CANCELLED: "Cancelada",
+      COMPLETED: "Finalizada",
       PAID: "Confirmado",
       PIX: "PIX",
     }[v] ?? v
