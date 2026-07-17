@@ -38,4 +38,5 @@ public class PaymentController {
     public PaymentResponse cancel(@PathVariable Long id) {
         return paymentService.cancel(id);
     }
+    @PatchMapping("/{id}/pending") public PaymentResponse pending(@PathVariable Long id) { return paymentService.markAsPending(id); }
 }

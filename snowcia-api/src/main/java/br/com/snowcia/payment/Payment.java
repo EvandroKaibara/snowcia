@@ -69,6 +69,7 @@ public class Payment {
         status = PaymentStatus.CANCELLED;
         paidAt = null;
     }
+    public void markAsPending() { status = PaymentStatus.PENDING; paidAt = null; }
 
     public void updateAmount(BigDecimal amount) {
         this.amount = amount;

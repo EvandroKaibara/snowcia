@@ -36,6 +36,7 @@ public class PaymentService {
         payment.cancel();
         return PaymentResponse.from(paymentRepository.save(payment));
     }
+    public PaymentResponse markAsPending(Long id) { var payment = findPayment(id); payment.markAsPending(); return PaymentResponse.from(paymentRepository.save(payment)); }
 
     private Payment findPayment(Long id) { return paymentRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pagamento não encontrado")); }
 }

@@ -128,6 +128,9 @@ public class ReservationService {
         }
     }
 
+    public ReservationResponse complete(AppUser admin, Long id) { ensureAdmin(admin); var reservation = findReservation(id); if (reservation.getStatus() != ReservationStatus.CONFIRMED) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas confirmadas podem ser finalizadas"); reservation.complete(); return ReservationResponse.from(reservationRepository.save(reservation)); }
+    public ReservationResponse updateInternalNotes(AppUser admin, Long id, String notes) { ensureAdmin(admin); var reservation = findReservation(id); reservation.updateInternalNotes(normalize(notes)); return ReservationResponse.from(reservationRepository.save(reservation)); }
+
     private void validateServiceForPet(Pet pet, ReservationServiceType serviceType) {
         boolean catSitter = serviceType.name().startsWith("CAT_SITTER");
         if ((pet.getSpecies() == PetSpecies.DOG && catSitter) || (pet.getSpecies() == PetSpecies.CAT && !catSitter)) {

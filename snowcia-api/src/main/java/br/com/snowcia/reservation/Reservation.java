@@ -58,6 +58,9 @@ public class Reservation {
     @Column(name = "decline_reason", length = 500)
     private String declineReason;
 
+    @Column(name = "internal_notes", length = 1000)
+    private String internalNotes;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -105,6 +108,9 @@ public class Reservation {
         declineReason = reason;
     }
 
+    public void complete() { status = ReservationStatus.COMPLETED; }
+    public void updateInternalNotes(String notes) { internalNotes = notes; }
+
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
@@ -126,5 +132,6 @@ public class Reservation {
     public ReservationServiceType getServiceType() { return serviceType; }
     public String getNotes() { return notes; }
     public String getDeclineReason() { return declineReason; }
+    public String getInternalNotes() { return internalNotes; }
     public BigDecimal getTotalAmount() { return totalAmount; }
 }
