@@ -244,7 +244,7 @@ function App() {
       />
     );
   const upcoming = data.reservations.filter(
-    (r) => new Date(`${r.checkInDate}T12:00`) >= new Date(),
+    (r) => r.status === "CONFIRMED" && new Date(`${r.checkInDate}T12:00`) >= new Date(),
   ).length;
   const paid = data.payments.filter((p) => p.status === "PAID").length;
   return (
