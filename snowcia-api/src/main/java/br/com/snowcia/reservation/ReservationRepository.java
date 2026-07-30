@@ -21,6 +21,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     Optional<Reservation> findByIdAndAssignedAdminId(Long id, Long adminId);
 
+    List<Reservation> findAllByPetIdAndStatusIn(Long petId, Collection<ReservationStatus> statuses);
+
     boolean existsByPetIdAndIdNotAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
             Long petId, Long id, Collection<ReservationStatus> statuses, LocalDate checkOutDate, LocalDate checkInDate);
 

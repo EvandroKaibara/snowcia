@@ -10,6 +10,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,5 +27,10 @@ public class ServiceOfferingController {
     @PostMapping @ResponseStatus(HttpStatus.CREATED) public ServiceOfferingResponse create(@AuthenticationPrincipal AppUser user, @Valid @RequestBody ServiceOfferingRequest request) { return service.create(user, request); }
     @PutMapping("/{id}") public ServiceOfferingResponse update(@AuthenticationPrincipal AppUser user, @PathVariable Long id, @Valid @RequestBody ServiceOfferingRequest request) { return service.update(user, id, request); }
     @PutMapping("/{id}/toggle") public ServiceOfferingResponse toggle(@AuthenticationPrincipal AppUser user, @PathVariable Long id) { return service.toggle(user, id); }
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void delete(@AuthenticationPrincipal AppUser user, @PathVariable Long id) { service.delete(user, id); }
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal AppUser user, @PathVariable Long id,
+            @RequestHeader(value = "X-Confirm-Service-Deletion", required = false) String confirmation) {
+        service.delete(user, id, confirmation);
+    }
 }

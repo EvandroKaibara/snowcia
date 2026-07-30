@@ -57,15 +57,22 @@ public class ReservationService {
     }
 
     public ReservationResponse create(AppUser owner, ReservationRequest request) {
-        var pet = findOwnedPet(owner, request.petId());
+        var pets = findOwnedPets(owner, request);
+        var pet = pets.getFirst();
         var offering = findOffering(pet, request.serviceOfferingId());
+        var additionalOfferings = findAdditionalOfferings(pets, offering, request.additionalServiceOfferingIds());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeSingleDayServiceDates(offering, request);
+        var pricingRequest = request;
         validateDates(request);
-        if (offering == null) validateServiceForPet(pet, request.serviceType());
-        ensureAvailable(pet, request, null);
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
-        var reservation = reservationRepository.save(new Reservation(pet, request.serviceType(), offering, assignedAdmin, request.checkInDate(),
+        for (var selectedPet : pets) {
+            if (offering == null) validateServiceForPet(selectedPet, request.serviceType()); else validateOfferingForPet(offering, selectedPet);
+            ensureAvailable(selectedPet, request, null);
+        }
+        var unitPrice = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
+        unitPrice = unitPrice.add(additionalOfferings.stream().map(extra -> calculateOfferingPriceForDates(extra, pricingRequest, additionalDatesFor(extra, pricingRequest))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        var price = unitPrice.multiply(BigDecimal.valueOf(pets.size()));
+        var reservation = reservationRepository.save(new Reservation(pet, petNames(pets), reservationDates(request), additionalServiceNames(additionalOfferings, request), request.serviceType(), offering, assignedAdmin, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
     }
@@ -84,8 +91,10 @@ public class ReservationService {
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
         var reservation = findOwnedReservation(owner, id);
         var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
+        var additionalOfferings = findAdditionalOfferings(List.of(reservation.getPet()), offering, request.additionalServiceOfferingIds());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeSingleDayServiceDates(offering, request);
+        var pricingRequest = request;
         validateDates(request);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser alteradas");
@@ -95,10 +104,12 @@ public class ReservationService {
         }
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         if (offering == null) validateServiceForPet(reservation.getPet(), request.serviceType());
-        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime()).add(calculateExtrasPrice(offering, request));
-        reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()));
+        var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
+        price = price.add(additionalOfferings.stream().map(extra -> calculateOfferingPriceForDates(extra, pricingRequest, additionalDatesFor(extra, pricingRequest))).reduce(BigDecimal.ZERO, BigDecimal::add));
+        reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), reservationDates(request));
         reservation.updateService(request.serviceType(), offering);
         reservation.assignAdmin(assignedAdmin);
+        reservation.updateAdditionalServiceNames(additionalServiceNames(additionalOfferings, request));
         reservation.updateTotalAmount(price);
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
@@ -174,13 +185,44 @@ public class ReservationService {
         if (id == null) return null;
         var offering = serviceOfferingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado"));
+        validateOfferingForPet(offering, pet);
+        return offering;
+    }
+
+    private List<ServiceOffering> findAdditionalOfferings(List<Pet> pets, ServiceOffering primaryOffering, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return ids.stream().distinct().map(id -> serviceOfferingRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço adicional não encontrado")))
+                .filter(offering -> primaryOffering == null || !offering.getId().equals(primaryOffering.getId()))
+                .peek(offering -> { if (isHosting(offering)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hospedagem não pode ser selecionada como serviço adicional"); })
+                .peek(offering -> pets.forEach(pet -> validateOfferingForPet(offering, pet)))
+                .toList();
+    }
+
+    private String additionalServiceNames(List<ServiceOffering> offerings, ReservationRequest request) {
+        return offerings.isEmpty() ? null : offerings.stream().map(offering -> offering.getName() + " (" + additionalDatesFor(offering, request).stream().map(LocalDate::toString).collect(java.util.stream.Collectors.joining(", ")) + ")").collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private void validateOfferingForPet(ServiceOffering offering, Pet pet) {
         var validTarget = offering.getTarget() == ServiceTarget.BOTH
                 || (offering.getTarget() == ServiceTarget.DOG && pet.getSpecies() == PetSpecies.DOG)
                 || (offering.getTarget() == ServiceTarget.CAT && pet.getSpecies() == PetSpecies.CAT);
         if (!offering.isActive() || !validTarget) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Serviço indisponível para este pet");
         }
-        return offering;
+    }
+
+    private BigDecimal calculateOfferingPrice(ServiceOffering offering, ReservationRequest request) {
+        if ((isDaycare(offering) || isWalk(offering)) && request.selectedDates() != null && !request.selectedDates().isEmpty()) {
+            return reservationDates(request).stream()
+                    .map(date -> calculateOfferingPrice(offering, date, date, request.checkInTime(), request.checkOutTime()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        return calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
+    }
+
+    private BigDecimal calculateOfferingPriceForDates(ServiceOffering offering, ReservationRequest request, List<LocalDate> dates) {
+        return dates.stream().map(date -> calculateOfferingPrice(offering, date, date, request.checkInTime(), request.checkOutTime())).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime) {
@@ -202,7 +244,10 @@ public class ReservationService {
 
     private ReservationRequest normalizeSingleDayServiceDates(ServiceOffering offering, ReservationRequest request) {
         if (!request.serviceType().name().startsWith("DAYCARE") && !request.serviceType().name().startsWith("WALK") && !isDaycare(offering) && !isWalk(offering)) return request;
-        return new ReservationRequest(request.petId(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), request.checkInDate(), request.checkInDate(), request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes());
+        var dates = reservationDates(request);
+        var firstDate = dates.stream().min(LocalDate::compareTo).orElse(request.checkInDate());
+        var lastDate = dates.stream().max(LocalDate::compareTo).orElse(request.checkInDate());
+        return new ReservationRequest(request.petId(), request.petIds(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), firstDate, lastDate, request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes(), dates, request.additionalServiceOfferingIds(), request.additionalServiceDates());
     }
 
     private boolean isDaycare(ServiceOffering offering) {
@@ -215,6 +260,12 @@ public class ReservationService {
         if (offering == null) return false;
         var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
         return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.WALK || name.contains("passeio") || name.contains("walk");
+    }
+
+    private boolean isHosting(ServiceOffering offering) {
+        if (offering == null) return false;
+        var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.HOSTING || name.contains("hospedagem") || name.contains("hosting");
     }
 
     private BigDecimal daycareOvertime(ServiceOffering offering, LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
@@ -243,6 +294,7 @@ public class ReservationService {
     }
 
     private long chargeableDays(ServiceOffering offering, ReservationRequest request) {
+        if ((isDaycare(offering) || isWalk(offering)) && request.selectedDates() != null && !request.selectedDates().isEmpty()) return reservationDates(request).size();
         if (offering.getBillingType() == br.com.snowcia.offering.BillingType.DAILY) {
             var minutes = Duration.between(LocalDateTime.of(request.checkInDate(), request.checkInTime()), LocalDateTime.of(request.checkOutDate(), request.checkOutTime())).toMinutes();
             return Math.max(1, (minutes + 1439) / 1440);
@@ -326,17 +378,47 @@ public class ReservationService {
 
     private void ensureAvailable(Pet pet, ReservationRequest request, Long reservationId) {
         var activeStatuses = List.of(ReservationStatus.PENDING, ReservationStatus.AWAITING_PAYMENT, ReservationStatus.CONFIRMED);
-        boolean conflict = reservationId == null
-                ? reservationRepository.existsByPetIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
-                        pet.getId(), activeStatuses, request.checkOutDate(), request.checkInDate())
-                : reservationRepository.existsByPetIdAndIdNotAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
-                        pet.getId(), reservationId, activeStatuses, request.checkOutDate(), request.checkInDate());
+        var requestedDates = reservationDates(request);
+        boolean conflict = reservationRepository.findAllByPetIdAndStatusIn(pet.getId(), activeStatuses).stream()
+                .filter(reservation -> reservationId == null || !reservation.getId().equals(reservationId))
+                .anyMatch(reservation -> reservationDates(reservation).stream().anyMatch(requestedDates::contains));
         if (conflict) throw new ResponseStatusException(HttpStatus.CONFLICT, "O pet já possui uma reserva nesse período");
     }
 
     private Pet findOwnedPet(AppUser owner, Long id) {
         return petRepository.findByIdAndOwnerId(id, owner.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pet não encontrado"));
+    }
+
+    private List<LocalDate> reservationDates(ReservationRequest request) {
+        if (request.selectedDates() != null && !request.selectedDates().isEmpty()) return request.selectedDates().stream().distinct().sorted().toList();
+        var dates = new java.util.ArrayList<LocalDate>();
+        for (var date = request.checkInDate(); !date.isAfter(request.checkOutDate()); date = date.plusDays(1)) dates.add(date);
+        return dates;
+    }
+
+    private List<LocalDate> additionalDatesFor(ServiceOffering offering, ReservationRequest request) {
+        var dates = request.additionalServiceDates() == null ? null : request.additionalServiceDates().get(offering.getId());
+        if (dates == null || dates.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione ao menos uma data para o serviço adicional " + offering.getName());
+        return dates.stream().distinct().sorted().toList();
+    }
+
+    private List<LocalDate> reservationDates(Reservation reservation) {
+        if (!reservation.getSelectedDates().isEmpty()) return reservation.getSelectedDates();
+        var dates = new java.util.ArrayList<LocalDate>();
+        for (var date = reservation.getCheckInDate(); !date.isAfter(reservation.getCheckOutDate()); date = date.plusDays(1)) dates.add(date);
+        return dates;
+    }
+
+    private List<Pet> findOwnedPets(AppUser owner, ReservationRequest request) {
+        var ids = request.petIds() == null || request.petIds().isEmpty() ? List.of(request.petId()) : request.petIds();
+        var pets = ids.stream().distinct().map(id -> findOwnedPet(owner, id)).toList();
+        if (pets.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione ao menos um pet");
+        return pets;
+    }
+
+    private String petNames(List<Pet> pets) {
+        return pets.stream().map(Pet::getName).collect(java.util.stream.Collectors.joining(", "));
     }
 
     private AppUser findReservationAdministrator(Long id) {

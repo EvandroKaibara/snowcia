@@ -161,14 +161,26 @@ function App() {
           method: item ? "PUT" : "POST",
           body: JSON.stringify(form),
         });
-      if (type === "reservation")
+      if (type === "reservation") {
+        const { multiDates, selectedDates, additionalDateDrafts, ...reservationForm } = form;
+        const offering = data.serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
+        const selectedPets = form.petId === "ALL"
+          ? data.pets.filter((pet) => serviceSupportsPet(offering, pet))
+          : data.pets.filter((pet) => String(pet.id) === String(form.petId));
+        const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
+        if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
+        if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o serviço.");
+        if ((form.additionalServiceOfferingIds ?? []).some((id) => !(form.additionalServiceDates?.[id]?.length))) throw new Error("Selecione ao menos uma data para cada serviço adicional.");
+        const firstDate = [...dates].sort()[0];
+        const lastDate = [...dates].sort().at(-1);
         await request(
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...form, petId: Number(form.petId), serviceOfferingId: form.serviceOfferingId ? Number(form.serviceOfferingId) : null, assignedAdminId: Number(form.assignedAdminId) }),
+            body: JSON.stringify({ ...reservationForm, petId: Number(selectedPets[0].id), petIds: selectedPets.map((pet) => Number(pet.id)), checkInDate: multiDates ? firstDate : reservationForm.checkInDate, checkOutDate: multiDates ? lastDate : reservationForm.checkOutDate, selectedDates: multiDates ? dates : null, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
           },
         );
+      }
       if (type === "service")
         await request(item ? `/api/services/${item.id}` : "/api/services", {
           method: item ? "PUT" : "POST",
@@ -224,10 +236,19 @@ function App() {
   }
   async function serviceAction(id, action) {
     try {
-      if (action === "delete" && !window.confirm("Excluir este serviço?")) return;
-      await request(`/api/services/${id}${action === "toggle" ? "/toggle" : ""}`, { method: action === "toggle" ? "PUT" : "DELETE" });
+      let headers;
+      if (action === "delete") {
+        if (!window.confirm("Excluir este serviço? Esta ação remove sua configuração do catálogo.")) return;
+        if (window.prompt("Para confirmar a exclusão definitiva, digite EXCLUIR.") !== "EXCLUIR") {
+          showToast("Exclusão cancelada. O texto de confirmação não foi informado.", "error");
+          return;
+        }
+        headers = { "X-Confirm-Service-Deletion": "EXCLUIR" };
+      }
+      await request(`/api/services/${id}${action === "toggle" ? "/toggle" : ""}`, { method: action === "toggle" ? "PUT" : "DELETE", headers });
       refresh();
-    } catch (e) { setError(e.message); }
+      showToast(action === "delete" ? "Serviço excluído com sucesso." : "Serviço atualizado com sucesso.");
+    } catch (e) { setError(e.message); showToast(e.message, "error"); }
   }
   async function updateProfile(profile) {
     try { await request("/api/users/me", { method: "PUT", body: JSON.stringify(profile) }); await refresh(); showToast("Alterações salvas com sucesso."); }
@@ -536,7 +557,7 @@ function ReservationCalendar({ reservations }) {
           >
             <strong>{day.getDate()}</strong>
             {reservations
-              .filter((r) => between(day, r.checkInDate, r.checkOutDate))
+              .filter((r) => reservationDates(r).includes(localDateKey(day)))
               .map((r) => (
                 <small className="calendar-pet" key={r.id}>
                   🐾 {r.petName}
@@ -690,7 +711,8 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>{isSingleDayService ? <>{formatDate(reservation.checkInDate)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</> : <>{formatDate(reservation.checkInDate)} {formatTime(reservation.checkInTime)} — {formatDate(reservation.checkOutDate)} {formatTime(reservation.checkOutTime)}</>} · {formatCurrency(reservation.totalAmount)}</small>
+        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</small>
+        <strong className="admin-total">Total: {formatCurrency(reservation.totalAmount)}</strong>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -701,6 +723,7 @@ function ReservationDetail({
           <small className="note">{reservation.notes}</small>
         )}
         {reservation.assignedAdminName && <small className="note">Administradora responsável: {reservation.assignedAdminName}</small>}
+        {reservation.additionalServiceNames && <small className="note">Serviços adicionais: {reservation.additionalServiceNames}</small>}
         {reservation.declineReason && (
           <small className="note decline-reason">
             Motivo da recusa: {reservation.declineReason}
@@ -746,7 +769,8 @@ function Payments({ payments, updatePayment }) {
             <div className="pet-dot money">◈</div>
             <div>
               <strong>{p.petName}</strong>
-              <small>PIX · {formatCurrency(p.amount)}</small>
+              <small>PIX</small>
+              <strong className="admin-total">Total: {formatCurrency(p.amount)}</strong>
             </div>
             <span className={`status ${p.status.toLowerCase()}`}>
               {labelOf(p.status)}
@@ -776,7 +800,7 @@ function Payments({ payments, updatePayment }) {
   );
 }
 function ServiceOfferings({ services, openEditor, onAction }) {
-  return <section className="list-card"><SectionHeading title="Serviços" onAction={() => openEditor({ type: "service" })} action="Adicionar serviço" /><div className="item-grid">{services.map((service) => <article className="pet-card admin-pet-card service-card" key={service.id}><div className="pet-emoji">✦</div><h3>{service.name}</h3><p>{service.category} · {service.target === "BOTH" ? "Cachorro e gato" : service.target === "DOG" ? "Cachorro" : "Gato"}</p><p className="card-meta">{service.priceConditions?.map((condition) => `${condition.name}: R$ ${Number(condition.price).toFixed(2)}`).join(" · ")}</p>{service.extras?.length > 0 && <div className="service-extra-list"><strong>Serviços extras</strong>{service.extras.map((extra) => <small key={extra.code}>{extra.name} (+R$ {Number(extra.price).toFixed(2)})</small>)}</div>}<div className="service-actions"><button className="card-more" onClick={() => openEditor({ type: "service", item: service })}>Editar</button><button className="small-action" onClick={() => onAction(service.id, "toggle")}>{service.active ? "Inativar" : "Ativar"}</button><button className="small-action danger" onClick={() => onAction(service.id, "delete")}>Excluir</button></div></article>)}</div>{!services.length && <Empty text="Nenhum serviço cadastrado. Use “Adicionar serviço” para criar o primeiro." />}</section>;
+  return <section className="list-card"><SectionHeading title="Serviços" onAction={() => openEditor({ type: "service" })} action="Adicionar serviço" /><div className="item-grid">{services.map((service) => <article className="pet-card admin-pet-card service-card" key={service.id}><div className="pet-emoji">✦</div><h3>{service.name}</h3><p>{service.category} · {service.target === "BOTH" ? "Cachorro e gato" : service.target === "DOG" ? "Cachorro" : "Gato"}</p><div className="service-price-list">{service.priceConditions?.map((condition) => <p key={`${condition.name}-${condition.price}`}><span>{condition.name}</span><strong>{formatCurrency(condition.price)}</strong></p>)}</div>{service.extras?.length > 0 && <div className="service-extra-list"><strong>Serviços extras</strong>{service.extras.map((extra) => <small key={extra.code}>{extra.name} (+R$ {Number(extra.price).toFixed(2)})</small>)}</div>}<div className="service-actions"><button className="card-more" onClick={() => openEditor({ type: "service", item: service })}>Editar</button><button className="small-action" onClick={() => onAction(service.id, "toggle")}>{service.active ? "Inativar" : "Ativar"}</button><button className="small-action danger" onClick={() => onAction(service.id, "delete")}>Excluir</button></div></article>)}</div>{!services.length && <Empty text="Nenhum serviço cadastrado. Use “Adicionar serviço” para criar o primeiro." />}</section>;
 }
 
 function ServiceEditor({ editor, onClose, onSave, loading }) {
@@ -796,7 +820,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
     (type === "pet"
       ? { name: "", species: "DOG", breed: "SRD (Sem Raça Definida)", birthDate: "" }
       : {
-          petId: pets[0]?.id ?? "",
+          petId: pets.length ? "ALL" : "",
           serviceType: "HOSTING_24H",
           checkInDate: "",
           checkOutDate: "",
@@ -806,13 +830,25 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
           serviceOfferingId: "",
           assignedAdminId: "",
           extraQuantities: {},
+          additionalServiceOfferingIds: [],
+          additionalServiceDates: {},
+          additionalDateDrafts: {},
+          multiDates: false,
+          selectedDates: [],
         });
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const isDaycare = isDayCareService(selectedOffering) || String(form.serviceType ?? "").startsWith("DAYCARE");
   const isSingleDayService = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
+  const allowsMultiDates = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
-  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities);
+  const reservationDates = allowsMultiDates && form.multiDates ? form.selectedDates ?? [] : form.checkInDate ? [form.checkInDate] : [];
+  const compatiblePets = form.petId === "ALL" ? pets.filter((pet) => serviceSupportsPet(selectedOffering, pet)) : pets.filter((pet) => String(pet.id) === String(form.petId));
+  const additionalOfferings = serviceOfferings.filter((service) => (form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id)));
+  const compatibleAdditionalOfferings = serviceOfferings.filter((service) => service.active && !isHostingService(service) && String(service.id) !== String(selectedOffering?.id) && compatiblePets.length > 0 && compatiblePets.every((pet) => serviceSupportsPet(service, pet)));
+  const primaryAmount = reservationDates.reduce((total, date) => total + (calculateOfferingAmount(selectedOffering, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities) ?? 0), 0);
+  const additionalAmount = additionalOfferings.reduce((total, service) => total + (form.additionalServiceDates?.[service.id] ?? []).reduce((sum, date) => sum + (calculateOfferingAmount(service, date, date, form.checkInTime, form.checkOutTime) ?? 0), 0), 0);
+  const estimatedAmount = reservationDates.length && compatiblePets.length ? (primaryAmount + additionalAmount) * compatiblePets.length : null;
   return (
     <div className="modal-backdrop">
       <form
@@ -877,6 +913,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
                   setForm({ ...form, petId: e.target.value, serviceOfferingId: "", serviceType: pet?.species === "CAT" ? "CAT_SITTER_DAILY" : "HOSTING_24H" });
                 }}
               >
+                {!item && <option value="ALL">Todos os pets</option>}
                 {pets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -886,9 +923,10 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             </Field>
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
-              const available = serviceOfferings.filter((service) => service.active && (service.target === "BOTH" || (service.target === "DOG" && pet?.species === "DOG") || (service.target === "CAT" && pet?.species === "CAT")));
-              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
+              const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
+              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {}, additionalServiceOfferingIds: [], additionalServiceDates: {}, additionalDateDrafts: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
+            {selectedOffering && compatibleAdditionalOfferings.length > 0 && <div className="reservation-additional-services"><strong>Adicionar outros serviços</strong><small>Selecione serviços cadastrados e informe as datas de cada um.</small>{compatibleAdditionalOfferings.map((service) => { const isSelected = (form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id)); const dates = form.additionalServiceDates?.[service.id] ?? []; const initialDates = dates.length ? dates : reservationDates; const draft = form.additionalDateDrafts?.[service.id] ?? form.checkInDate ?? ""; return <div className="additional-service-option" key={service.id}><label><input type="checkbox" checked={isSelected} onChange={(e) => setForm({ ...form, additionalServiceOfferingIds: e.target.checked ? [...(form.additionalServiceOfferingIds ?? []), service.id] : (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== String(service.id)), additionalServiceDates: e.target.checked ? { ...(form.additionalServiceDates ?? {}), [service.id]: initialDates } : Object.fromEntries(Object.entries(form.additionalServiceDates ?? {}).filter(([id]) => String(id) !== String(service.id))) })} /><span>{service.name}</span></label>{isSelected && <div className="additional-service-dates"><input type="date" min={today()} value={draft} onChange={(e) => setForm({ ...form, additionalDateDrafts: { ...(form.additionalDateDrafts ?? {}), [service.id]: e.target.value } })} /><button type="button" className="add-condition" disabled={!draft || dates.includes(draft)} onClick={() => setForm({ ...form, additionalServiceDates: { ...(form.additionalServiceDates ?? {}), [service.id]: [...dates, draft].sort() } })}>Adicionar data</button><div className="selected-dates">{dates.map((date) => <button type="button" key={date} onClick={() => setForm({ ...form, additionalServiceDates: { ...(form.additionalServiceDates ?? {}), [service.id]: dates.filter((value) => value !== date) } })}>{formatDate(date)} ×</button>)}</div></div>}</div>; })}</div>}
             <Field label="Administradora responsável">
               <select required value={form.assignedAdminId ?? ""} onChange={(e) => setForm({ ...form, assignedAdminId: e.target.value })}>
                 <option value="" disabled>Selecione o responsável</option>
@@ -896,8 +934,12 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
               </select>
               {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
             </Field>
-            {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
-            {isSingleDayService ? <Field label="Data do serviço">
+            {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em>{extra.code === "additional_walk" && <small className="extra-help">Quantidade de passeios extras: informe quantos passeios extras deseja adicionar durante o período da reserva.</small>}</span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
+            {allowsMultiDates && <label className="toggle-field multi-date-toggle"><input type="checkbox" checked={Boolean(form.multiDates)} onChange={(e) => setForm({ ...form, multiDates: e.target.checked, selectedDates: e.target.checked ? form.selectedDates ?? [] : [] })} />Selecionar múltiplas datas</label>}
+            {allowsMultiDates && form.multiDates ? <Field label="Datas do serviço">
+              <div className="multi-date-picker"><input type="date" min={today()} value={form.checkInDate} onChange={(e) => setForm({ ...form, checkInDate: e.target.value, checkOutDate: e.target.value })} /><button type="button" className="add-condition" disabled={!form.checkInDate || form.selectedDates?.includes(form.checkInDate)} onClick={() => setForm({ ...form, selectedDates: [...(form.selectedDates ?? []), form.checkInDate].sort() })}>Adicionar data</button></div>
+              {form.selectedDates?.length > 0 && <div className="selected-dates">{form.selectedDates.map((date) => <button type="button" key={date} onClick={() => setForm({ ...form, selectedDates: form.selectedDates.filter((value) => value !== date) })}>{formatDate(date)} ×</button>)}</div>}
+            </Field> : isSingleDayService ? <Field label="Data do serviço">
               <input
                 required
                 type="date"
@@ -1019,12 +1061,8 @@ function ReservationRow({ reservation }) {
           {labelOf(reservation.status)}
         </span>
       </div>
-      <p className="reservation-dates">
-        {formatDate(reservation.checkInDate)}{" "}
-        {formatTime(reservation.checkInTime)} —{" "}
-        {formatDate(reservation.checkOutDate)}{" "}
-        {formatTime(reservation.checkOutTime)}
-      </p>
+      <p className="reservation-dates">{reservationDateLabel(reservation)} {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</p>
+      {reservation.additionalServiceNames && <p className="muted">Serviços adicionais: {reservation.additionalServiceNames}</p>}
       {reservation.status === "AWAITING_PAYMENT" && <p className="payment-whatsapp-tip">O pagamento será realizado pelo WhatsApp. Aguarde o envio do link.</p>}
       {reservation.notes && <p className="muted">{reservation.notes}</p>}
       {reservation.declineReason && (
@@ -1080,8 +1118,32 @@ function isWalkService(service) {
   const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   return service?.category === "WALK" || name.includes("passeio") || name.includes("walk");
 }
+function isHostingService(service) {
+  const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return service?.category === "HOSTING" || name.includes("hospedagem") || name.includes("hosting");
+}
+function serviceSupportsPet(service, pet) {
+  if (!service || !pet) return false;
+  if (isHostingService(service) && pet.species !== "DOG") return false;
+  return service.target === "BOTH" || (service.target === "DOG" && pet.species === "DOG") || (service.target === "CAT" && pet.species === "CAT");
+}
 function isSingleDayReservation(reservation) {
   return isDayCareReservation(reservation) || String(reservation?.serviceType ?? "").startsWith("WALK") || isWalkService({ name: reservation?.serviceName });
+}
+function reservationDates(reservation) {
+  if (reservation?.selectedDates?.length) return reservation.selectedDates;
+  const dates = [];
+  for (let date = new Date(`${reservation.checkInDate}T12:00:00`); date <= new Date(`${reservation.checkOutDate}T12:00:00`); date = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 12)) {
+    dates.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+  }
+  return dates;
+}
+function reservationDateLabel(reservation) {
+  const dates = reservationDates(reservation);
+  return dates.map(formatDate).join(" · ");
+}
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00", extraQuantities = {}) {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;
