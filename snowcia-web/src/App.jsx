@@ -162,7 +162,7 @@ function App() {
           body: JSON.stringify(form),
         });
       if (type === "reservation") {
-        const { multiDates, selectedDates, ...reservationForm } = form;
+        const { multiDates, selectedDates, additionalDateDrafts, ...reservationForm } = form;
         const offering = data.serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
         const selectedPets = form.petId === "ALL"
           ? data.pets.filter((pet) => serviceSupportsPet(offering, pet))
@@ -170,6 +170,7 @@ function App() {
         const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
         if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
         if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o serviço.");
+        if ((form.additionalServiceOfferingIds ?? []).some((id) => !(form.additionalServiceDates?.[id]?.length))) throw new Error("Selecione ao menos uma data para cada serviço adicional.");
         const firstDate = [...dates].sort()[0];
         const lastDate = [...dates].sort().at(-1);
         await request(
@@ -828,6 +829,8 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
           assignedAdminId: "",
           extraQuantities: {},
           additionalServiceOfferingIds: [],
+          additionalServiceDates: {},
+          additionalDateDrafts: {},
           multiDates: false,
           selectedDates: [],
         });
@@ -841,7 +844,9 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
   const compatiblePets = form.petId === "ALL" ? pets.filter((pet) => serviceSupportsPet(selectedOffering, pet)) : pets.filter((pet) => String(pet.id) === String(form.petId));
   const additionalOfferings = serviceOfferings.filter((service) => (form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id)));
   const compatibleAdditionalOfferings = serviceOfferings.filter((service) => service.active && String(service.id) !== String(selectedOffering?.id) && compatiblePets.length > 0 && compatiblePets.every((pet) => serviceSupportsPet(service, pet)));
-  const estimatedAmount = reservationDates.length && compatiblePets.length ? reservationDates.reduce((total, date) => total + [selectedOffering, ...additionalOfferings].reduce((sum, service) => sum + (calculateOfferingAmount(service, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, service?.id === selectedOffering?.id ? form.extraQuantities : {}) ?? 0), 0), 0) * compatiblePets.length : null;
+  const primaryAmount = reservationDates.reduce((total, date) => total + (calculateOfferingAmount(selectedOffering, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities) ?? 0), 0);
+  const additionalAmount = additionalOfferings.reduce((total, service) => total + (form.additionalServiceDates?.[service.id] ?? []).reduce((sum, date) => sum + (calculateOfferingAmount(service, date, date, form.checkInTime, form.checkOutTime) ?? 0), 0), 0);
+  const estimatedAmount = reservationDates.length && compatiblePets.length ? (primaryAmount + additionalAmount) * compatiblePets.length : null;
   return (
     <div className="modal-backdrop">
       <form
@@ -917,9 +922,9 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
               const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
-              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {}, additionalServiceOfferingIds: (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== e.target.value) })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
+              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {}, additionalServiceOfferingIds: [], additionalServiceDates: {}, additionalDateDrafts: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
-            {selectedOffering && compatibleAdditionalOfferings.length > 0 && <div className="reservation-additional-services"><strong>Adicionar outros serviços</strong><small>Selecione serviços cadastrados para realizar junto com esta reserva.</small>{compatibleAdditionalOfferings.map((service) => <label key={service.id}><input type="checkbox" checked={(form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id))} onChange={(e) => setForm({ ...form, additionalServiceOfferingIds: e.target.checked ? [...(form.additionalServiceOfferingIds ?? []), service.id] : (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== String(service.id)) })} /><span>{service.name}</span></label>)}</div>}
+            {selectedOffering && compatibleAdditionalOfferings.length > 0 && <div className="reservation-additional-services"><strong>Adicionar outros serviços</strong><small>Selecione serviços cadastrados e informe as datas de cada um.</small>{compatibleAdditionalOfferings.map((service) => { const isSelected = (form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id)); const dates = form.additionalServiceDates?.[service.id] ?? []; const draft = form.additionalDateDrafts?.[service.id] ?? form.checkInDate ?? ""; return <div className="additional-service-option" key={service.id}><label><input type="checkbox" checked={isSelected} onChange={(e) => setForm({ ...form, additionalServiceOfferingIds: e.target.checked ? [...(form.additionalServiceOfferingIds ?? []), service.id] : (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== String(service.id)), additionalServiceDates: e.target.checked ? { ...(form.additionalServiceDates ?? {}), [service.id]: dates } : Object.fromEntries(Object.entries(form.additionalServiceDates ?? {}).filter(([id]) => String(id) !== String(service.id))) })} /><span>{service.name}</span></label>{isSelected && <div className="additional-service-dates"><input type="date" min={today()} value={draft} onChange={(e) => setForm({ ...form, additionalDateDrafts: { ...(form.additionalDateDrafts ?? {}), [service.id]: e.target.value } })} /><button type="button" className="add-condition" disabled={!draft || dates.includes(draft)} onClick={() => setForm({ ...form, additionalServiceDates: { ...(form.additionalServiceDates ?? {}), [service.id]: [...dates, draft].sort() } })}>Adicionar data</button><div className="selected-dates">{dates.map((date) => <button type="button" key={date} onClick={() => setForm({ ...form, additionalServiceDates: { ...(form.additionalServiceDates ?? {}), [service.id]: dates.filter((value) => value !== date) } })}>{formatDate(date)} ×</button>)}</div></div>}</div>; })}</div>}
             <Field label="Administradora responsável">
               <select required value={form.assignedAdminId ?? ""} onChange={(e) => setForm({ ...form, assignedAdminId: e.target.value })}>
                 <option value="" disabled>Selecione o responsável</option>

@@ -70,9 +70,9 @@ public class ReservationService {
             ensureAvailable(selectedPet, request, null);
         }
         var unitPrice = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
-        unitPrice = unitPrice.add(additionalOfferings.stream().map(extra -> calculateOfferingPrice(extra, pricingRequest)).reduce(BigDecimal.ZERO, BigDecimal::add));
+        unitPrice = unitPrice.add(additionalOfferings.stream().map(extra -> calculateOfferingPriceForDates(extra, pricingRequest, additionalDatesFor(extra, pricingRequest))).reduce(BigDecimal.ZERO, BigDecimal::add));
         var price = unitPrice.multiply(BigDecimal.valueOf(pets.size()));
-        var reservation = reservationRepository.save(new Reservation(pet, petNames(pets), reservationDates(request), additionalServiceNames(additionalOfferings), request.serviceType(), offering, assignedAdmin, request.checkInDate(),
+        var reservation = reservationRepository.save(new Reservation(pet, petNames(pets), reservationDates(request), additionalServiceNames(additionalOfferings, request), request.serviceType(), offering, assignedAdmin, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
     }
@@ -105,11 +105,11 @@ public class ReservationService {
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         if (offering == null) validateServiceForPet(reservation.getPet(), request.serviceType());
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
-        price = price.add(additionalOfferings.stream().map(extra -> calculateOfferingPrice(extra, pricingRequest)).reduce(BigDecimal.ZERO, BigDecimal::add));
+        price = price.add(additionalOfferings.stream().map(extra -> calculateOfferingPriceForDates(extra, pricingRequest, additionalDatesFor(extra, pricingRequest))).reduce(BigDecimal.ZERO, BigDecimal::add));
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), reservationDates(request));
         reservation.updateService(request.serviceType(), offering);
         reservation.assignAdmin(assignedAdmin);
-        reservation.updateAdditionalServiceNames(additionalServiceNames(additionalOfferings));
+        reservation.updateAdditionalServiceNames(additionalServiceNames(additionalOfferings, request));
         reservation.updateTotalAmount(price);
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
@@ -198,8 +198,8 @@ public class ReservationService {
                 .toList();
     }
 
-    private String additionalServiceNames(List<ServiceOffering> offerings) {
-        return offerings.isEmpty() ? null : offerings.stream().map(ServiceOffering::getName).collect(java.util.stream.Collectors.joining(", "));
+    private String additionalServiceNames(List<ServiceOffering> offerings, ReservationRequest request) {
+        return offerings.isEmpty() ? null : offerings.stream().map(offering -> offering.getName() + " (" + additionalDatesFor(offering, request).stream().map(LocalDate::toString).collect(java.util.stream.Collectors.joining(", ")) + ")").collect(java.util.stream.Collectors.joining(", "));
     }
 
     private void validateOfferingForPet(ServiceOffering offering, Pet pet) {
@@ -218,6 +218,10 @@ public class ReservationService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
         return calculateOfferingPrice(offering, request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime());
+    }
+
+    private BigDecimal calculateOfferingPriceForDates(ServiceOffering offering, ReservationRequest request, List<LocalDate> dates) {
+        return dates.stream().map(date -> calculateOfferingPrice(offering, date, date, request.checkInTime(), request.checkOutTime())).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal calculateOfferingPrice(ServiceOffering offering, LocalDate checkIn, LocalDate checkOut, java.time.LocalTime checkInTime, java.time.LocalTime checkOutTime) {
@@ -242,7 +246,7 @@ public class ReservationService {
         var dates = reservationDates(request);
         var firstDate = dates.stream().min(LocalDate::compareTo).orElse(request.checkInDate());
         var lastDate = dates.stream().max(LocalDate::compareTo).orElse(request.checkInDate());
-        return new ReservationRequest(request.petId(), request.petIds(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), firstDate, lastDate, request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes(), dates, request.additionalServiceOfferingIds());
+        return new ReservationRequest(request.petId(), request.petIds(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), firstDate, lastDate, request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes(), dates, request.additionalServiceOfferingIds(), request.additionalServiceDates());
     }
 
     private boolean isDaycare(ServiceOffering offering) {
@@ -384,6 +388,12 @@ public class ReservationService {
         var dates = new java.util.ArrayList<LocalDate>();
         for (var date = request.checkInDate(); !date.isAfter(request.checkOutDate()); date = date.plusDays(1)) dates.add(date);
         return dates;
+    }
+
+    private List<LocalDate> additionalDatesFor(ServiceOffering offering, ReservationRequest request) {
+        var dates = request.additionalServiceDates() == null ? null : request.additionalServiceDates().get(offering.getId());
+        if (dates == null || dates.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione ao menos uma data para o serviço adicional " + offering.getName());
+        return dates.stream().distinct().sorted().toList();
     }
 
     private List<LocalDate> reservationDates(Reservation reservation) {
