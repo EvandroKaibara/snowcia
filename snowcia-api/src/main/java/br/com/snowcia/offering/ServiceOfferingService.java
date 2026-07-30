@@ -28,7 +28,7 @@ public class ServiceOfferingService {
         if (name.contains("cat sitter") || name.contains("catsitter")) return List.of(extra("additional_cat", "Gato adicional", 15, "PER_DAY"), extra("additional_visit", "Visita adicional", 10, "PER_UNIT"), extra("medication_up_to_2", "Medicamento (até 2 medicamentos)", 5, "PER_DAY"), extra("medication_3_plus", "Medicamento (3 ou mais)", 10, "PER_DAY"));
         if (name.contains("day care") || name.contains("daycare")) return List.of(extra("extra_walk", "Passeio extra", 10, "PER_UNIT"), extra("additional_dog_walk", "Cão adicional no passeio", 5, "PER_UNIT"), extra("medication_up_to_2", "Medicamento (até 2 medicamentos)", 5, "PER_DAY"), extra("medication_3_plus", "Medicamento (3 ou mais)", 10, "PER_DAY"));
         if (name.contains("hospedagem")) return List.of(extra("medication_up_to_2", "Medicamento (até 2 medicamentos)", 5, "PER_DAY"), extra("medication_3_plus", "Medicamento (3 ou mais)", 10, "PER_DAY"));
-        if (name.contains("passeio")) return List.of(extra("additional_dog", "Cachorro adicional", 15, "PER_UNIT"), extra("additional_walk", "Passeio adicional", 15, "PER_UNIT"));
+        if (name.contains("passeio")) return List.of(extra("additional_walk", "Passeio adicional", 15, "PER_UNIT"));
         return List.of();
     }
     private ServiceExtra extra(String code, String name, int price, String pricing) { return new ServiceExtra(code, name, BigDecimal.valueOf(price), pricing); }

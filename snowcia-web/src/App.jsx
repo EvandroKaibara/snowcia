@@ -805,7 +805,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
     (type === "pet"
       ? { name: "", species: "DOG", breed: "SRD (Sem Raça Definida)", birthDate: "" }
       : {
-          petId: pets[0]?.id ?? "",
+          petId: pets.length ? "ALL" : "",
           serviceType: "HOSTING_24H",
           checkInDate: "",
           checkOutDate: "",
@@ -900,7 +900,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             </Field>
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
-              const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? !isWalkService(service) && pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
+              const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
               return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
             <Field label="Administradora responsável">
