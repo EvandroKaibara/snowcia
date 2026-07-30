@@ -169,7 +169,7 @@ function App() {
           : data.pets.filter((pet) => String(pet.id) === String(form.petId));
         const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
         if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
-        if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o Day Care.");
+        if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o serviço.");
         for (const date of dates) await request(
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
@@ -822,8 +822,9 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const isDaycare = isDayCareService(selectedOffering) || String(form.serviceType ?? "").startsWith("DAYCARE");
   const isSingleDayService = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
+  const allowsMultiDates = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
-  const reservationDates = isDaycare && form.multiDates ? form.selectedDates ?? [] : form.checkInDate ? [form.checkInDate] : [];
+  const reservationDates = allowsMultiDates && form.multiDates ? form.selectedDates ?? [] : form.checkInDate ? [form.checkInDate] : [];
   const compatiblePets = form.petId === "ALL" ? pets.filter((pet) => serviceSupportsPet(selectedOffering, pet)) : pets.filter((pet) => String(pet.id) === String(form.petId));
   const estimatedAmount = reservationDates.length && compatiblePets.length ? reservationDates.reduce((total, date) => total + (calculateOfferingAmount(selectedOffering, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities) ?? 0), 0) * compatiblePets.length : null;
   return (
@@ -911,8 +912,8 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
               {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
             </Field>
             {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
-            {isDaycare && <label className="toggle-field multi-date-toggle"><input type="checkbox" checked={Boolean(form.multiDates)} onChange={(e) => setForm({ ...form, multiDates: e.target.checked, selectedDates: e.target.checked ? form.selectedDates ?? [] : [] })} />Selecionar múltiplas datas</label>}
-            {isDaycare && form.multiDates ? <Field label="Datas do Day Care">
+            {allowsMultiDates && <label className="toggle-field multi-date-toggle"><input type="checkbox" checked={Boolean(form.multiDates)} onChange={(e) => setForm({ ...form, multiDates: e.target.checked, selectedDates: e.target.checked ? form.selectedDates ?? [] : [] })} />Selecionar múltiplas datas</label>}
+            {allowsMultiDates && form.multiDates ? <Field label="Datas do serviço">
               <div className="multi-date-picker"><input type="date" min={today()} value={form.checkInDate} onChange={(e) => setForm({ ...form, checkInDate: e.target.value, checkOutDate: e.target.value })} /><button type="button" className="add-condition" disabled={!form.checkInDate || form.selectedDates?.includes(form.checkInDate)} onClick={() => setForm({ ...form, selectedDates: [...(form.selectedDates ?? []), form.checkInDate].sort() })}>Adicionar data</button></div>
               {form.selectedDates?.length > 0 && <div className="selected-dates">{form.selectedDates.map((date) => <button type="button" key={date} onClick={() => setForm({ ...form, selectedDates: form.selectedDates.filter((value) => value !== date) })}>{formatDate(date)} ×</button>)}</div>}
             </Field> : isSingleDayService ? <Field label="Data do serviço">
