@@ -13,7 +13,7 @@ public record ReservationResponse(Long id, Long petId, String petName, LocalDate
         String declineReason, BigDecimal totalAmount, String ownerName, String ownerEmail, String ownerPhone, Long assignedAdminId, String assignedAdminName) {
 
     public static ReservationResponse from(Reservation reservation) {
-        return new ReservationResponse(reservation.getId(), reservation.getPet().getId(), reservation.getPet().getName(),
+        return new ReservationResponse(reservation.getId(), reservation.getPet().getId(), reservation.getPetNames() == null ? reservation.getPet().getName() : reservation.getPetNames(),
                 reservation.getCheckInDate(), reservation.getCheckOutDate(), reservation.getCheckInTime(), reservation.getCheckOutTime(), reservation.getStatus(), reservation.getServiceType(), reservation.getServiceOffering() == null ? null : reservation.getServiceOffering().getId(), reservation.getServiceOffering() == null ? reservation.getServiceType().name() : reservation.getServiceOffering().getName(),
                 reservation.getNotes(), reservation.getDeclineReason(), reservation.getTotalAmount(),
                 reservation.getPet().getOwner().getName(), reservation.getPet().getOwner().getEmail(),

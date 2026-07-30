@@ -34,6 +34,9 @@ public class Reservation {
     @JoinColumn(name = "pet_id", nullable = false)
     private Pet pet;
 
+    @Column(name = "pet_names", length = 500)
+    private String petNames;
+
     @Column(name = "check_in_date", nullable = false)
     private LocalDate checkInDate;
 
@@ -83,9 +86,10 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
+    public Reservation(Pet pet, String petNames, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
             LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
+        this.petNames = petNames;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
         this.serviceOffering = serviceOffering;
@@ -139,6 +143,7 @@ public class Reservation {
 
     public Long getId() { return id; }
     public Pet getPet() { return pet; }
+    public String getPetNames() { return petNames; }
     public LocalDate getCheckInDate() { return checkInDate; }
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public LocalTime getCheckInTime() { return checkInTime; }

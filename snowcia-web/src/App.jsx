@@ -170,11 +170,11 @@ function App() {
         const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
         if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
         if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o Day Care.");
-        for (const pet of selectedPets) for (const date of dates) await request(
+        for (const date of dates) await request(
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...reservationForm, petId: Number(pet.id), checkInDate: multiDates ? date : reservationForm.checkInDate, checkOutDate: multiDates ? date : reservationForm.checkOutDate, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
+            body: JSON.stringify({ ...reservationForm, petId: Number(selectedPets[0].id), petIds: selectedPets.map((pet) => Number(pet.id)), checkInDate: multiDates ? date : reservationForm.checkInDate, checkOutDate: multiDates ? date : reservationForm.checkOutDate, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
           },
         );
       }
