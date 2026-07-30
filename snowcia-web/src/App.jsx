@@ -711,7 +711,8 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)} · <span className="admin-reservation-price">{formatCurrency(reservation.totalAmount)}</span></small>
+        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</small>
+        <strong className="admin-total">Total: {formatCurrency(reservation.totalAmount)}</strong>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -768,7 +769,8 @@ function Payments({ payments, updatePayment }) {
             <div className="pet-dot money">◈</div>
             <div>
               <strong>{p.petName}</strong>
-              <small>PIX · <span className="admin-payment-price">{formatCurrency(p.amount)}</span></small>
+              <small>PIX</small>
+              <strong className="admin-total">Total: {formatCurrency(p.amount)}</strong>
             </div>
             <span className={`status ${p.status.toLowerCase()}`}>
               {labelOf(p.status)}
