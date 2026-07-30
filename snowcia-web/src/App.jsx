@@ -721,6 +721,7 @@ function ReservationDetail({
           <small className="note">{reservation.notes}</small>
         )}
         {reservation.assignedAdminName && <small className="note">Administradora responsável: {reservation.assignedAdminName}</small>}
+        {reservation.additionalServiceNames && <small className="note">Serviços adicionais: {reservation.additionalServiceNames}</small>}
         {reservation.declineReason && (
           <small className="note decline-reason">
             Motivo da recusa: {reservation.declineReason}
@@ -826,6 +827,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
           serviceOfferingId: "",
           assignedAdminId: "",
           extraQuantities: {},
+          additionalServiceOfferingIds: [],
           multiDates: false,
           selectedDates: [],
         });
@@ -837,7 +839,9 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
   const reservationDates = allowsMultiDates && form.multiDates ? form.selectedDates ?? [] : form.checkInDate ? [form.checkInDate] : [];
   const compatiblePets = form.petId === "ALL" ? pets.filter((pet) => serviceSupportsPet(selectedOffering, pet)) : pets.filter((pet) => String(pet.id) === String(form.petId));
-  const estimatedAmount = reservationDates.length && compatiblePets.length ? reservationDates.reduce((total, date) => total + (calculateOfferingAmount(selectedOffering, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities) ?? 0), 0) * compatiblePets.length : null;
+  const additionalOfferings = serviceOfferings.filter((service) => (form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id)));
+  const compatibleAdditionalOfferings = serviceOfferings.filter((service) => service.active && String(service.id) !== String(selectedOffering?.id) && compatiblePets.length > 0 && compatiblePets.every((pet) => serviceSupportsPet(service, pet)));
+  const estimatedAmount = reservationDates.length && compatiblePets.length ? reservationDates.reduce((total, date) => total + [selectedOffering, ...additionalOfferings].reduce((sum, service) => sum + (calculateOfferingAmount(service, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, service?.id === selectedOffering?.id ? form.extraQuantities : {}) ?? 0), 0), 0) * compatiblePets.length : null;
   return (
     <div className="modal-backdrop">
       <form
@@ -913,8 +917,9 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
               const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
-              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
+              return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {}, additionalServiceOfferingIds: (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== e.target.value) })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
+            {selectedOffering && compatibleAdditionalOfferings.length > 0 && <div className="reservation-additional-services"><strong>Adicionar outros serviços</strong><small>Selecione serviços cadastrados para realizar junto com esta reserva.</small>{compatibleAdditionalOfferings.map((service) => <label key={service.id}><input type="checkbox" checked={(form.additionalServiceOfferingIds ?? []).map(String).includes(String(service.id))} onChange={(e) => setForm({ ...form, additionalServiceOfferingIds: e.target.checked ? [...(form.additionalServiceOfferingIds ?? []), service.id] : (form.additionalServiceOfferingIds ?? []).filter((id) => String(id) !== String(service.id)) })} /><span>{service.name}</span></label>)}</div>}
             <Field label="Administradora responsável">
               <select required value={form.assignedAdminId ?? ""} onChange={(e) => setForm({ ...form, assignedAdminId: e.target.value })}>
                 <option value="" disabled>Selecione o responsável</option>
@@ -1050,6 +1055,7 @@ function ReservationRow({ reservation }) {
         </span>
       </div>
       <p className="reservation-dates">{reservationDateLabel(reservation)} {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</p>
+      {reservation.additionalServiceNames && <p className="muted">Serviços adicionais: {reservation.additionalServiceNames}</p>}
       {reservation.status === "AWAITING_PAYMENT" && <p className="payment-whatsapp-tip">O pagamento será realizado pelo WhatsApp. Aguarde o envio do link.</p>}
       {reservation.notes && <p className="muted">{reservation.notes}</p>}
       {reservation.declineReason && (

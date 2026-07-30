@@ -42,6 +42,9 @@ public class Reservation {
     @Column(name = "selected_dates", length = 1000)
     private String selectedDates;
 
+    @Column(name = "additional_service_names", length = 1000)
+    private String additionalServiceNames;
+
     @Column(name = "check_in_date", nullable = false)
     private LocalDate checkInDate;
 
@@ -91,10 +94,11 @@ public class Reservation {
     protected Reservation() {
     }
 
-    public Reservation(Pet pet, String petNames, List<LocalDate> selectedDates, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
+    public Reservation(Pet pet, String petNames, List<LocalDate> selectedDates, String additionalServiceNames, ReservationServiceType serviceType, ServiceOffering serviceOffering, AppUser assignedAdmin, LocalDate checkInDate, LocalDate checkOutDate,
             LocalTime checkInTime, LocalTime checkOutTime, String notes, BigDecimal totalAmount) {
         this.pet = pet;
         this.petNames = petNames;
+        this.additionalServiceNames = additionalServiceNames;
         this.status = ReservationStatus.PENDING;
         this.serviceType = serviceType;
         this.serviceOffering = serviceOffering;
@@ -129,6 +133,8 @@ public class Reservation {
         status = ReservationStatus.DECLINED;
         declineReason = reason;
     }
+
+    public void updateAdditionalServiceNames(String names) { this.additionalServiceNames = names; }
     public void cancel() { status = ReservationStatus.CANCELLED; }
     public void updateService(ReservationServiceType serviceType, ServiceOffering serviceOffering) { this.serviceType = serviceType; this.serviceOffering = serviceOffering; }
     public void assignAdmin(AppUser admin) { this.assignedAdmin = admin; }
@@ -151,6 +157,7 @@ public class Reservation {
     public Pet getPet() { return pet; }
     public String getPetNames() { return petNames; }
     public List<LocalDate> getSelectedDates() { return selectedDates == null || selectedDates.isBlank() ? List.of() : Arrays.stream(selectedDates.split(",")).map(LocalDate::parse).toList(); }
+    public String getAdditionalServiceNames() { return additionalServiceNames; }
     public LocalDate getCheckInDate() { return checkInDate; }
     public LocalDate getCheckOutDate() { return checkOutDate; }
     public LocalTime getCheckInTime() { return checkInTime; }

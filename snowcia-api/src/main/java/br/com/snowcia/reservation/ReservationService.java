@@ -60,16 +60,19 @@ public class ReservationService {
         var pets = findOwnedPets(owner, request);
         var pet = pets.getFirst();
         var offering = findOffering(pet, request.serviceOfferingId());
+        var additionalOfferings = findAdditionalOfferings(pets, offering, request.additionalServiceOfferingIds());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeSingleDayServiceDates(offering, request);
+        var pricingRequest = request;
         validateDates(request);
         for (var selectedPet : pets) {
             if (offering == null) validateServiceForPet(selectedPet, request.serviceType()); else validateOfferingForPet(offering, selectedPet);
             ensureAvailable(selectedPet, request, null);
         }
         var unitPrice = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
+        unitPrice = unitPrice.add(additionalOfferings.stream().map(extra -> calculateOfferingPrice(extra, pricingRequest)).reduce(BigDecimal.ZERO, BigDecimal::add));
         var price = unitPrice.multiply(BigDecimal.valueOf(pets.size()));
-        var reservation = reservationRepository.save(new Reservation(pet, petNames(pets), reservationDates(request), request.serviceType(), offering, assignedAdmin, request.checkInDate(),
+        var reservation = reservationRepository.save(new Reservation(pet, petNames(pets), reservationDates(request), additionalServiceNames(additionalOfferings), request.serviceType(), offering, assignedAdmin, request.checkInDate(),
                 request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), price));
         return ReservationResponse.from(reservation);
     }
@@ -88,8 +91,10 @@ public class ReservationService {
     public ReservationResponse update(AppUser owner, Long id, ReservationRequest request) {
         var reservation = findOwnedReservation(owner, id);
         var offering = findOffering(reservation.getPet(), request.serviceOfferingId());
+        var additionalOfferings = findAdditionalOfferings(List.of(reservation.getPet()), offering, request.additionalServiceOfferingIds());
         var assignedAdmin = findReservationAdministrator(request.assignedAdminId());
         request = normalizeSingleDayServiceDates(offering, request);
+        var pricingRequest = request;
         validateDates(request);
         if (reservation.getStatus() != ReservationStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Somente reservas pendentes podem ser alteradas");
@@ -100,9 +105,11 @@ public class ReservationService {
         ensureAvailable(reservation.getPet(), request, reservation.getId());
         if (offering == null) validateServiceForPet(reservation.getPet(), request.serviceType());
         var price = offering == null ? pricingService.calculate(request.serviceType(), request.checkInDate(), request.checkOutDate()).totalAmount() : calculateOfferingPrice(offering, request).add(calculateExtrasPrice(offering, request));
+        price = price.add(additionalOfferings.stream().map(extra -> calculateOfferingPrice(extra, pricingRequest)).reduce(BigDecimal.ZERO, BigDecimal::add));
         reservation.update(request.checkInDate(), request.checkOutDate(), request.checkInTime(), request.checkOutTime(), normalize(request.notes()), reservationDates(request));
         reservation.updateService(request.serviceType(), offering);
         reservation.assignAdmin(assignedAdmin);
+        reservation.updateAdditionalServiceNames(additionalServiceNames(additionalOfferings));
         reservation.updateTotalAmount(price);
         return ReservationResponse.from(reservationRepository.save(reservation));
     }
@@ -182,6 +189,19 @@ public class ReservationService {
         return offering;
     }
 
+    private List<ServiceOffering> findAdditionalOfferings(List<Pet> pets, ServiceOffering primaryOffering, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return ids.stream().distinct().map(id -> serviceOfferingRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço adicional não encontrado")))
+                .filter(offering -> primaryOffering == null || !offering.getId().equals(primaryOffering.getId()))
+                .peek(offering -> pets.forEach(pet -> validateOfferingForPet(offering, pet)))
+                .toList();
+    }
+
+    private String additionalServiceNames(List<ServiceOffering> offerings) {
+        return offerings.isEmpty() ? null : offerings.stream().map(ServiceOffering::getName).collect(java.util.stream.Collectors.joining(", "));
+    }
+
     private void validateOfferingForPet(ServiceOffering offering, Pet pet) {
         var validTarget = offering.getTarget() == ServiceTarget.BOTH
                 || (offering.getTarget() == ServiceTarget.DOG && pet.getSpecies() == PetSpecies.DOG)
@@ -222,7 +242,7 @@ public class ReservationService {
         var dates = reservationDates(request);
         var firstDate = dates.stream().min(LocalDate::compareTo).orElse(request.checkInDate());
         var lastDate = dates.stream().max(LocalDate::compareTo).orElse(request.checkInDate());
-        return new ReservationRequest(request.petId(), request.petIds(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), firstDate, lastDate, request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes(), dates);
+        return new ReservationRequest(request.petId(), request.petIds(), request.serviceType(), request.serviceOfferingId(), request.assignedAdminId(), firstDate, lastDate, request.checkInTime(), request.checkOutTime(), request.extraQuantities(), request.notes(), dates, request.additionalServiceOfferingIds());
     }
 
     private boolean isDaycare(ServiceOffering offering) {

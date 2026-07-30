@@ -22,5 +22,6 @@ public record ReservationRequest(
         @NotNull LocalTime checkOutTime,
         Map<String, Integer> extraQuantities,
         @Size(max = 500) String notes,
-        List<LocalDate> selectedDates) {
+        List<LocalDate> selectedDates,
+        List<Long> additionalServiceOfferingIds) {
 }
