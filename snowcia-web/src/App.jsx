@@ -711,7 +711,7 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)} · {formatCurrency(reservation.totalAmount)}</small>
+        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)} · <span className="admin-reservation-price">{formatCurrency(reservation.totalAmount)}</span></small>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -768,7 +768,7 @@ function Payments({ payments, updatePayment }) {
             <div className="pet-dot money">◈</div>
             <div>
               <strong>{p.petName}</strong>
-              <small>PIX · {formatCurrency(p.amount)}</small>
+              <small>PIX · <span className="admin-payment-price">{formatCurrency(p.amount)}</span></small>
             </div>
             <span className={`status ${p.status.toLowerCase()}`}>
               {labelOf(p.status)}
@@ -798,7 +798,7 @@ function Payments({ payments, updatePayment }) {
   );
 }
 function ServiceOfferings({ services, openEditor, onAction }) {
-  return <section className="list-card"><SectionHeading title="Serviços" onAction={() => openEditor({ type: "service" })} action="Adicionar serviço" /><div className="item-grid">{services.map((service) => <article className="pet-card admin-pet-card service-card" key={service.id}><div className="pet-emoji">✦</div><h3>{service.name}</h3><p>{service.category} · {service.target === "BOTH" ? "Cachorro e gato" : service.target === "DOG" ? "Cachorro" : "Gato"}</p><p className="card-meta">{service.priceConditions?.map((condition) => `${condition.name}: R$ ${Number(condition.price).toFixed(2)}`).join(" · ")}</p>{service.extras?.length > 0 && <div className="service-extra-list"><strong>Serviços extras</strong>{service.extras.map((extra) => <small key={extra.code}>{extra.name} (+R$ {Number(extra.price).toFixed(2)})</small>)}</div>}<div className="service-actions"><button className="card-more" onClick={() => openEditor({ type: "service", item: service })}>Editar</button><button className="small-action" onClick={() => onAction(service.id, "toggle")}>{service.active ? "Inativar" : "Ativar"}</button><button className="small-action danger" onClick={() => onAction(service.id, "delete")}>Excluir</button></div></article>)}</div>{!services.length && <Empty text="Nenhum serviço cadastrado. Use “Adicionar serviço” para criar o primeiro." />}</section>;
+  return <section className="list-card"><SectionHeading title="Serviços" onAction={() => openEditor({ type: "service" })} action="Adicionar serviço" /><div className="item-grid">{services.map((service) => <article className="pet-card admin-pet-card service-card" key={service.id}><div className="pet-emoji">✦</div><h3>{service.name}</h3><p>{service.category} · {service.target === "BOTH" ? "Cachorro e gato" : service.target === "DOG" ? "Cachorro" : "Gato"}</p><div className="service-price-list">{service.priceConditions?.map((condition) => <p key={`${condition.name}-${condition.price}`}><span>{condition.name}</span><strong>{formatCurrency(condition.price)}</strong></p>)}</div>{service.extras?.length > 0 && <div className="service-extra-list"><strong>Serviços extras</strong>{service.extras.map((extra) => <small key={extra.code}>{extra.name} (+R$ {Number(extra.price).toFixed(2)})</small>)}</div>}<div className="service-actions"><button className="card-more" onClick={() => openEditor({ type: "service", item: service })}>Editar</button><button className="small-action" onClick={() => onAction(service.id, "toggle")}>{service.active ? "Inativar" : "Ativar"}</button><button className="small-action danger" onClick={() => onAction(service.id, "delete")}>Excluir</button></div></article>)}</div>{!services.length && <Empty text="Nenhum serviço cadastrado. Use “Adicionar serviço” para criar o primeiro." />}</section>;
 }
 
 function ServiceEditor({ editor, onClose, onSave, loading }) {
