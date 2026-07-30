@@ -194,6 +194,7 @@ public class ReservationService {
         return ids.stream().distinct().map(id -> serviceOfferingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço adicional não encontrado")))
                 .filter(offering -> primaryOffering == null || !offering.getId().equals(primaryOffering.getId()))
+                .peek(offering -> { if (isHosting(offering)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Hospedagem não pode ser selecionada como serviço adicional"); })
                 .peek(offering -> pets.forEach(pet -> validateOfferingForPet(offering, pet)))
                 .toList();
     }
@@ -259,6 +260,12 @@ public class ReservationService {
         if (offering == null) return false;
         var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
         return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.WALK || name.contains("passeio") || name.contains("walk");
+    }
+
+    private boolean isHosting(ServiceOffering offering) {
+        if (offering == null) return false;
+        var name = Normalizer.normalize(offering.getName(), Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase();
+        return offering.getCategory() == br.com.snowcia.offering.ServiceCategory.HOSTING || name.contains("hospedagem") || name.contains("hosting");
     }
 
     private BigDecimal daycareOvertime(ServiceOffering offering, LocalDate checkIn, java.time.LocalTime checkInTime, LocalDate checkOut, java.time.LocalTime checkOutTime) {
