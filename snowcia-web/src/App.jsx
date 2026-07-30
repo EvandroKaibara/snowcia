@@ -235,10 +235,19 @@ function App() {
   }
   async function serviceAction(id, action) {
     try {
-      if (action === "delete" && !window.confirm("Excluir este serviço?")) return;
-      await request(`/api/services/${id}${action === "toggle" ? "/toggle" : ""}`, { method: action === "toggle" ? "PUT" : "DELETE" });
+      let headers;
+      if (action === "delete") {
+        if (!window.confirm("Excluir este serviço? Esta ação remove sua configuração do catálogo.")) return;
+        if (window.prompt("Para confirmar a exclusão definitiva, digite EXCLUIR.") !== "EXCLUIR") {
+          showToast("Exclusão cancelada. O texto de confirmação não foi informado.", "error");
+          return;
+        }
+        headers = { "X-Confirm-Service-Deletion": "EXCLUIR" };
+      }
+      await request(`/api/services/${id}${action === "toggle" ? "/toggle" : ""}`, { method: action === "toggle" ? "PUT" : "DELETE", headers });
       refresh();
-    } catch (e) { setError(e.message); }
+      showToast(action === "delete" ? "Serviço excluído com sucesso." : "Serviço atualizado com sucesso.");
+    } catch (e) { setError(e.message); showToast(e.message, "error"); }
   }
   async function updateProfile(profile) {
     try { await request("/api/users/me", { method: "PUT", body: JSON.stringify(profile) }); await refresh(); showToast("Alterações salvas com sucesso."); }

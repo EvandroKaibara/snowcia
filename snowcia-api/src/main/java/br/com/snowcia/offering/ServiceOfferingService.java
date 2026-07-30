@@ -18,7 +18,11 @@ public class ServiceOfferingService {
     public ServiceOfferingResponse create(AppUser user, ServiceOfferingRequest request) { requireAdmin(user); return ServiceOfferingResponse.from(repository.save(newService(request))); }
     public ServiceOfferingResponse update(AppUser user, Long id, ServiceOfferingRequest request) { requireAdmin(user); var service = find(id); update(service, request); return ServiceOfferingResponse.from(repository.save(service)); }
     public ServiceOfferingResponse toggle(AppUser user, Long id) { requireAdmin(user); var service = find(id); service.update(service.getName(), service.getDescription(), service.getCategory(), service.getTarget(), service.getBillingType(), service.getDurationMinutes(), service.getDurationUnit(), !service.isActive(), service.isAllowDateSelection(), service.isAllowTimeSelection(), service.isAllowCustomerNotes(), service.isAllowCheckInOut(), service.getMaxPets(), service.getPriceConditions(), service.getExtras()); return ServiceOfferingResponse.from(repository.save(service)); }
-    public void delete(AppUser user, Long id) { requireAdmin(user); repository.delete(find(id)); }
+    public void delete(AppUser user, Long id, String confirmation) {
+        requireAdmin(user);
+        if (!"EXCLUIR".equals(confirmation)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Confirmação dupla obrigatória para excluir um serviço");
+        repository.delete(find(id));
+    }
     private ServiceOffering newService(ServiceOfferingRequest r) { return new ServiceOffering(clean(r.name()), clean(r.description()), r.category(), r.target(), r.billingType(), r.durationMinutes(), r.durationUnit(), r.active(), r.allowDateSelection(), r.allowTimeSelection(), r.allowCustomerNotes(), r.allowCheckInOut(), r.maxPets(), prices(r), extras(r)); }
     private void update(ServiceOffering service, ServiceOfferingRequest r) { service.update(clean(r.name()), clean(r.description()), r.category(), r.target(), r.billingType(), r.durationMinutes(), r.durationUnit(), r.active(), r.allowDateSelection(), r.allowTimeSelection(), r.allowCustomerNotes(), r.allowCheckInOut(), r.maxPets(), prices(r), extras(r)); }
     private List<ServicePriceCondition> prices(ServiceOfferingRequest r) { return r.priceConditions().stream().map(p -> new ServicePriceCondition(clean(p.name()), p.price())).toList(); }
