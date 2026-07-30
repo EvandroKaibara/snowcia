@@ -1,0 +1,1 @@
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS selected_dates VARCHAR(1000);

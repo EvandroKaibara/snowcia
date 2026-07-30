@@ -170,11 +170,13 @@ function App() {
         const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
         if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
         if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o serviço.");
-        for (const date of dates) await request(
+        const firstDate = [...dates].sort()[0];
+        const lastDate = [...dates].sort().at(-1);
+        await request(
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...reservationForm, petId: Number(selectedPets[0].id), petIds: selectedPets.map((pet) => Number(pet.id)), checkInDate: multiDates ? date : reservationForm.checkInDate, checkOutDate: multiDates ? date : reservationForm.checkOutDate, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
+            body: JSON.stringify({ ...reservationForm, petId: Number(selectedPets[0].id), petIds: selectedPets.map((pet) => Number(pet.id)), checkInDate: multiDates ? firstDate : reservationForm.checkInDate, checkOutDate: multiDates ? lastDate : reservationForm.checkOutDate, selectedDates: multiDates ? dates : null, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
           },
         );
       }
@@ -545,7 +547,7 @@ function ReservationCalendar({ reservations }) {
           >
             <strong>{day.getDate()}</strong>
             {reservations
-              .filter((r) => between(day, r.checkInDate, r.checkOutDate))
+              .filter((r) => reservationDates(r).includes(localDateKey(day)))
               .map((r) => (
                 <small className="calendar-pet" key={r.id}>
                   🐾 {r.petName}
@@ -699,7 +701,7 @@ function ReservationDetail({
         <strong>
           {reservation.petName} · {reservation.serviceName || serviceName(reservation.serviceType)}
         </strong>
-        <small>{isSingleDayService ? <>{formatDate(reservation.checkInDate)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</> : <>{formatDate(reservation.checkInDate)} {formatTime(reservation.checkInTime)} — {formatDate(reservation.checkOutDate)} {formatTime(reservation.checkOutTime)}</>} · {formatCurrency(reservation.totalAmount)}</small>
+        <small>{reservationDateLabel(reservation)} · {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)} · {formatCurrency(reservation.totalAmount)}</small>
         {isAdmin && (
           <small className="note">
             Cliente: {reservation.ownerName} ·{" "}
@@ -1038,12 +1040,7 @@ function ReservationRow({ reservation }) {
           {labelOf(reservation.status)}
         </span>
       </div>
-      <p className="reservation-dates">
-        {formatDate(reservation.checkInDate)}{" "}
-        {formatTime(reservation.checkInTime)} —{" "}
-        {formatDate(reservation.checkOutDate)}{" "}
-        {formatTime(reservation.checkOutTime)}
-      </p>
+      <p className="reservation-dates">{reservationDateLabel(reservation)} {formatTime(reservation.checkInTime)} — {formatTime(reservation.checkOutTime)}</p>
       {reservation.status === "AWAITING_PAYMENT" && <p className="payment-whatsapp-tip">O pagamento será realizado pelo WhatsApp. Aguarde o envio do link.</p>}
       {reservation.notes && <p className="muted">{reservation.notes}</p>}
       {reservation.declineReason && (
@@ -1110,6 +1107,21 @@ function serviceSupportsPet(service, pet) {
 }
 function isSingleDayReservation(reservation) {
   return isDayCareReservation(reservation) || String(reservation?.serviceType ?? "").startsWith("WALK") || isWalkService({ name: reservation?.serviceName });
+}
+function reservationDates(reservation) {
+  if (reservation?.selectedDates?.length) return reservation.selectedDates;
+  const dates = [];
+  for (let date = new Date(`${reservation.checkInDate}T12:00:00`); date <= new Date(`${reservation.checkOutDate}T12:00:00`); date = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 12)) {
+    dates.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+  }
+  return dates;
+}
+function reservationDateLabel(reservation) {
+  const dates = reservationDates(reservation);
+  return dates.map(formatDate).join(" · ");
+}
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 function calculateOfferingAmount(service, checkInDate, checkOutDate, checkInTime = "08:00", checkOutTime = "18:00", extraQuantities = {}) {
   if (!service || !checkInDate || !checkOutDate || checkOutDate < checkInDate) return null;
