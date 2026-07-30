@@ -66,3 +66,8 @@
 .reservation-extras label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ocean); font-size: .84rem; font-weight: 700; }
 .reservation-extras em { display: block; color: #61729d; font-size: .74rem; font-style: normal; font-weight: 500; margin-top: 2px; }
 .reservation-extras input { width: 74px; min-width: 74px; padding: 8px 9px; }
+.multi-date-toggle { margin: 8px 0 2px; }
+.multi-date-picker { display: flex; gap: 8px; align-items: center; }
+.multi-date-picker .add-condition { white-space: nowrap; }
+.selected-dates { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; }
+.selected-dates button { border: 0; border-radius: 99px; padding: 6px 9px; background: var(--butter); color: var(--ocean); font-size: 11px; font-weight: 800; cursor: pointer; }

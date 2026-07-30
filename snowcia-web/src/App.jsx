@@ -161,14 +161,23 @@ function App() {
           method: item ? "PUT" : "POST",
           body: JSON.stringify(form),
         });
-      if (type === "reservation")
-        await request(
+      if (type === "reservation") {
+        const { multiDates, selectedDates, ...reservationForm } = form;
+        const offering = data.serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
+        const selectedPets = form.petId === "ALL"
+          ? data.pets.filter((pet) => serviceSupportsPet(offering, pet))
+          : data.pets.filter((pet) => String(pet.id) === String(form.petId));
+        const dates = multiDates ? [...new Set(selectedDates ?? [])] : [form.checkInDate];
+        if (!selectedPets.length) throw new Error("Nenhum pet é compatível com o serviço selecionado.");
+        if (!dates.length || dates.some((date) => !date)) throw new Error("Selecione ao menos uma data para o Day Care.");
+        for (const pet of selectedPets) for (const date of dates) await request(
           item ? `/api/reservations/${item.id}` : "/api/reservations",
           {
             method: item ? "PUT" : "POST",
-            body: JSON.stringify({ ...form, petId: Number(form.petId), serviceOfferingId: form.serviceOfferingId ? Number(form.serviceOfferingId) : null, assignedAdminId: Number(form.assignedAdminId) }),
+            body: JSON.stringify({ ...reservationForm, petId: Number(pet.id), checkInDate: multiDates ? date : reservationForm.checkInDate, checkOutDate: multiDates ? date : reservationForm.checkOutDate, serviceOfferingId: reservationForm.serviceOfferingId ? Number(reservationForm.serviceOfferingId) : null, assignedAdminId: Number(reservationForm.assignedAdminId) }),
           },
         );
+      }
       if (type === "service")
         await request(item ? `/api/services/${item.id}` : "/api/services", {
           method: item ? "PUT" : "POST",
@@ -806,13 +815,17 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
           serviceOfferingId: "",
           assignedAdminId: "",
           extraQuantities: {},
+          multiDates: false,
+          selectedDates: [],
         });
   const [form, setForm] = useState(initial);
   const selectedOffering = serviceOfferings.find((service) => String(service.id) === String(form.serviceOfferingId));
   const isDaycare = isDayCareService(selectedOffering) || String(form.serviceType ?? "").startsWith("DAYCARE");
   const isSingleDayService = isDaycare || isWalkService(selectedOffering) || String(form.serviceType ?? "").startsWith("WALK");
   const showCheckInOut = selectedOffering?.allowCheckInOut ?? true;
-  const estimatedAmount = calculateOfferingAmount(selectedOffering, form.checkInDate, form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities);
+  const reservationDates = isDaycare && form.multiDates ? form.selectedDates ?? [] : form.checkInDate ? [form.checkInDate] : [];
+  const compatiblePets = form.petId === "ALL" ? pets.filter((pet) => serviceSupportsPet(selectedOffering, pet)) : pets.filter((pet) => String(pet.id) === String(form.petId));
+  const estimatedAmount = reservationDates.length && compatiblePets.length ? reservationDates.reduce((total, date) => total + (calculateOfferingAmount(selectedOffering, date, isSingleDayService ? date : form.checkOutDate, form.checkInTime, form.checkOutTime, form.extraQuantities) ?? 0), 0) * compatiblePets.length : null;
   return (
     <div className="modal-backdrop">
       <form
@@ -877,6 +890,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
                   setForm({ ...form, petId: e.target.value, serviceOfferingId: "", serviceType: pet?.species === "CAT" ? "CAT_SITTER_DAILY" : "HOSTING_24H" });
                 }}
               >
+                {!item && <option value="ALL">Todos os pets</option>}
                 {pets.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -886,7 +900,7 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
             </Field>
             {(() => {
               const pet = pets.find((value) => String(value.id) === String(form.petId));
-              const available = serviceOfferings.filter((service) => service.active && (service.target === "BOTH" || (service.target === "DOG" && pet?.species === "DOG") || (service.target === "CAT" && pet?.species === "CAT")));
+              const available = serviceOfferings.filter((service) => service.active && (form.petId === "ALL" ? !isWalkService(service) && pets.some((candidate) => serviceSupportsPet(service, candidate)) : serviceSupportsPet(service, pet)));
               return <Field label="Serviço"><select required value={form.serviceOfferingId ?? ""} onChange={(e) => setForm({ ...form, serviceOfferingId: e.target.value, extraQuantities: {} })}><option value="" disabled>Selecione um serviço</option>{available.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select>{!available.length && <small className="field-hint">Não há serviços ativos para a espécie deste pet.</small>}</Field>;
             })()}
             <Field label="Administradora responsável">
@@ -897,7 +911,11 @@ function Editor({ editor, pets, serviceOfferings, reservationAdministrators, onC
               {!reservationAdministrators.length && <small className="field-hint">As administradoras estão sendo preparadas. Atualize a página em instantes.</small>}
             </Field>
             {selectedOffering?.extras?.length > 0 && <div className="reservation-extras"><strong>Serviços extras</strong><small>Informe a quantidade de cada adicional desejado.</small>{selectedOffering.extras.map((extra) => <label key={extra.code}><span>{extra.name} <em>+ {formatCurrency(extra.price)}{extra.pricing === "PER_DAY" ? " por dia" : ""}</em></span><input type="number" min="0" value={form.extraQuantities?.[extra.code] ?? 0} onChange={(e) => setForm({ ...form, extraQuantities: { ...(form.extraQuantities ?? {}), [extra.code]: Number(e.target.value) } })} /></label>)}</div>}
-            {isSingleDayService ? <Field label="Data do serviço">
+            {isDaycare && <label className="toggle-field multi-date-toggle"><input type="checkbox" checked={Boolean(form.multiDates)} onChange={(e) => setForm({ ...form, multiDates: e.target.checked, selectedDates: e.target.checked ? form.selectedDates ?? [] : [] })} />Selecionar múltiplas datas</label>}
+            {isDaycare && form.multiDates ? <Field label="Datas do Day Care">
+              <div className="multi-date-picker"><input type="date" min={today()} value={form.checkInDate} onChange={(e) => setForm({ ...form, checkInDate: e.target.value, checkOutDate: e.target.value })} /><button type="button" className="add-condition" disabled={!form.checkInDate || form.selectedDates?.includes(form.checkInDate)} onClick={() => setForm({ ...form, selectedDates: [...(form.selectedDates ?? []), form.checkInDate].sort() })}>Adicionar data</button></div>
+              {form.selectedDates?.length > 0 && <div className="selected-dates">{form.selectedDates.map((date) => <button type="button" key={date} onClick={() => setForm({ ...form, selectedDates: form.selectedDates.filter((value) => value !== date) })}>{formatDate(date)} ×</button>)}</div>}
+            </Field> : isSingleDayService ? <Field label="Data do serviço">
               <input
                 required
                 type="date"
@@ -1079,6 +1097,15 @@ function isDayCareReservation(reservation) {
 function isWalkService(service) {
   const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   return service?.category === "WALK" || name.includes("passeio") || name.includes("walk");
+}
+function isHostingService(service) {
+  const name = String(service?.name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return service?.category === "HOSTING" || name.includes("hospedagem") || name.includes("hosting");
+}
+function serviceSupportsPet(service, pet) {
+  if (!service || !pet) return false;
+  if (isHostingService(service) && pet.species !== "DOG") return false;
+  return service.target === "BOTH" || (service.target === "DOG" && pet.species === "DOG") || (service.target === "CAT" && pet.species === "CAT");
 }
 function isSingleDayReservation(reservation) {
   return isDayCareReservation(reservation) || String(reservation?.serviceType ?? "").startsWith("WALK") || isWalkService({ name: reservation?.serviceName });
