@@ -11,8 +11,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     List<Reservation> findAllByPetOwnerIdOrderByCheckInDateAsc(Long ownerId);
 
-    List<Reservation> findAllByOrderByCheckInDateAsc();
-
     List<Reservation> findAllByAssignedAdminIdOrderByCheckInDateAsc(Long adminId);
 
     List<Reservation> findAllByStatusAndCheckOutDateBefore(ReservationStatus status, LocalDate date);
@@ -22,10 +20,4 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     Optional<Reservation> findByIdAndAssignedAdminId(Long id, Long adminId);
 
     List<Reservation> findAllByPetIdAndStatusIn(Long petId, Collection<ReservationStatus> statuses);
-
-    boolean existsByPetIdAndIdNotAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
-            Long petId, Long id, Collection<ReservationStatus> statuses, LocalDate checkOutDate, LocalDate checkInDate);
-
-    boolean existsByPetIdAndStatusInAndCheckInDateLessThanAndCheckOutDateGreaterThan(
-            Long petId, Collection<ReservationStatus> statuses, LocalDate checkOutDate, LocalDate checkInDate);
 }
