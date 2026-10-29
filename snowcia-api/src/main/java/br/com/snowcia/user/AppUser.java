@@ -24,6 +24,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Table(name = "users")
 public class AppUser implements UserDetails {
 
+    /** The only admins clients can assign a reservation to. */
+    public static final List<String> RESERVATION_ADMIN_EMAILS = List.of("jussara@snowcia.local", "isabella@snowcia.local");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
