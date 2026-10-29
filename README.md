@@ -10,6 +10,12 @@ Sistema de gestão de hotel pet, com API Spring Boot, PostgreSQL, Flyway e auten
 
 As migrações Flyway criam automaticamente as tabelas de perfis, usuários, pets, reservas e pagamentos.
 
+Para rodar só os testes unitários, sem banco: `./mvnw test -Dtest=ReservationPricingServiceTest -Dsurefire.failIfNoSpecifiedTests=false`. O teste `contextLoads` precisa do PostgreSQL rodando.
+
+## Como executar o frontend
+
+Dentro de `snowcia-web`, rode `npm install` e depois `npm run dev`. Detalhes em `snowcia-web/README.md`.
+
 ## Endpoints
 
 - `POST /api/auth/register` e `POST /api/auth/login`

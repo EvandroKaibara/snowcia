@@ -1,16 +1,28 @@
-# React + Vite
+# snowcia-web
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Painel web da Snow & Cia, em React com Vite. Tutores cadastram os pets e pedem serviços. A equipe aceita ou recusa os pedidos, confirma pagamentos e mantém o catálogo de serviços.
 
-Currently, two official plugins are available:
+## Rodar
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+O app abre em `http://localhost:5173` e chama a API em `http://localhost:8080`. Para outro endereço, defina `VITE_API_URL` num arquivo `.env.local`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Comandos
 
-## Expanding the Oxlint configuration
+- `npm test`: testes do cálculo de preço e da montagem da reserva (`node --test`).
+- `npm run lint`: oxlint.
+- `npm run build`: gera o build de produção em `dist/`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Organização
+
+- `src/App.jsx`: login, navegação, carregamento dos dados e ações que chamam a API.
+- `src/screens/`: uma tela por arquivo (visão geral, pets, reservas, painel da equipe, perfil).
+- `src/components/ui.jsx`: componentes compartilhados (campo, modal, aviso, ícones).
+- `src/lib/`: formatação, regras do catálogo e a estimativa de preço.
+- `src/assets/brand/`: logo e ilustrações exportadas do Figma SNOW_CIA_ASSETS.
+
+O valor que aparece no formulário de reserva é só uma estimativa. Quem cobra é a API, em `ReservationPricingService`. Os dois lados têm testes com os mesmos casos, então uma mudança de regra precisa entrar nos dois.
